@@ -39,7 +39,15 @@
       ((eq? '% (car lis)) (modulo (M_value (cadr lis)) (M_value (caddr lis))))
       (else (getValue (car lis) state))
       
-    
-
-
+;Getting the value of a variable
+(define MValNum
+  (lambda (num)
+    (cond
+      ;returning 0 might be a bad idea
+      ((null? num) '0)
+      (else (+ (MValNum (cdr num)) (* (car num) (expt 10 (- (length num) 1))) )) )))    
+;Tests for MValNum
+;(MValNum '())
+;(MValNum '(3 5 9))
+;(MValNum '(0 1 0 0 1 0))
 
