@@ -36,14 +36,14 @@
   (lambda (lis state)
     (cond
       ((null? lis) (error "input not a statement" lis))
-      ((list? (car lis)) (M_value(car lis)))
+      ((list? (car lis)) (M_value(mlist(car lis))))
       ((number? (car lis)) (car lis))
-      ((eq? '+ (car lis)) (+ (M_value (cons (cadr lis) '()) state) (M_value (cons (caddr lis) '()) state)))
-      ((eq? '- (car lis)) (- (M_value (cadr lis) state) (M_value (caddr lis) state)))
-      ((eq? '* (car lis)) (* (M_value (cadr lis) state) (M_value (caddr lis) state)))
-      ((eq? '/ (car lis)) (/ (M_value (cadr lis) state) (M_value (caddr lis) state)))
-      ((eq? '% (car lis)) (modulo (M_value (cadr lis) state) (M_value (caddr lis) state)))
-      (else (getValue (car lis) state)))))
+      ((eq? '+ (car lis)) (+ (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
+      ((eq? '- (car lis)) (- (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
+      ((eq? '* (car lis)) (* (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
+      ((eq? '/ (car lis)) (/ (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
+      ((eq? '% (car lis)) (modulo (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
+      (else (lookup (car lis) state)))))
       
 ;Getting the decimal value of a number represented with each digit as an element in a list
 (define M_valNum
