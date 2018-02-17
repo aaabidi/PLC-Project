@@ -45,7 +45,17 @@
       ((eq? '% (car lis)) (modulo (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
       (else (lookup (car lis) state)))))
 ;(M_value '(+ (* 3 x) 4) '((x) (5)))
+
+(define M_bolean
+  (lambda (lis state)
+    (cond
+      ((null? lis) (error "input not a statement" lis))
+      ((list? (car lis)) (M_boolean (car lis) state))
+      ((eq? '== (car lis)) (equals? (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
+      ((eq? '!= (car lis)) (not (equals? (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state))))
+      ((eq? '<  (car lis)) (< (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
       
+                  
 ;Getting the decimal value of a number represented with each digit as an element in a list
 (define M_valNum
   (lambda (num)
