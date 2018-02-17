@@ -20,7 +20,7 @@
 ; adds a variable to the state
 (define M_stateAssign
   (lambda (state a b)
-    (M_stateAssign (removeState a state) a b)))
+    (addToState (removeState a state) a b)))
 
 ; Ammar - I commented this out because I didn't see it and wrote my own with error handling (M_valVar)
 ;getValue returns the value of a variable from a state
@@ -36,7 +36,7 @@
   (lambda (lis state)
     (cond
       ((null? lis) (error "input not a statement" lis))
-      ((list? (car lis)) (M_value(mlist(car lis))))
+      ((list? (car lis)) (M_value (car lis) state))
       ((number? (car lis)) (car lis))
       ((eq? '+ (car lis)) (+ (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
       ((eq? '- (car lis)) (- (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
@@ -44,6 +44,7 @@
       ((eq? '/ (car lis)) (/ (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
       ((eq? '% (car lis)) (modulo (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
       (else (lookup (car lis) state)))))
+;(M_value '(+ (* 3 x) 4) '((x) (5)))
       
 ;Getting the decimal value of a number represented with each digit as an element in a list
 (define M_valNum
