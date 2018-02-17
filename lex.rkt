@@ -1,6 +1,6 @@
 ; Uncomment these two lines if you are using racket instead of scheme
-;#lang racket
-;(provide (all-defined-out))
+#lang racket
+(provide (all-defined-out))
 
 ;;===============================================================
 ;; The Lexical Analyzer
