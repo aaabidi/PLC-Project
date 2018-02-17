@@ -1,4 +1,5 @@
 ; If you are using racket instead of scheme, uncomment these two lines, comment the (load "lex.scm") line and uncomment the (require "lex.scm") line
+
 #lang racket
 (provide (all-defined-out))
 

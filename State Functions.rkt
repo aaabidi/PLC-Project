@@ -35,8 +35,8 @@
   (lambda (lis state)
     (cond
       ((list? (car lis)) (M_value (car lis)))
-      ((digit? (car lis)) (M_digit (car lis)))
-      ((eq? '+ (car lis)) (+ (M_value (cadr lis)) (M_value (caddr lis))))
+      ((number? (car lis)) (M_digit (car lis)))
+      ((eq? '+ (car lis)) (+ (cons (M_value (cadr lis)) '()) (M_value (cons (caddr lis) '()))))
       ((eq? '- (car lis)) (- (M_value (cadr lis)) (M_value (caddr lis))))
       ((eq? '* (car lis)) (* (M_value (cadr lis)) (M_value (caddr lis))))
       ((eq? '/ (car lis)) (/ (M_value (cadr lis)) (M_value (caddr lis))))
