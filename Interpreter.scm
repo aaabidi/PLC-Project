@@ -47,6 +47,7 @@
 ;(M_value '(+ (* 3 x) 4) '((x) (5)))
 
 ;(M_boolean '(> (* x (+ x x)) y) ((x y) (3 50)))
+;(M_boolean '(== true (>= (+ 3 7) (+ 4 10))) '(()()))
 (define M_boolean
   (lambda (lis state)
     (cond
@@ -61,6 +62,8 @@
       ((eq? '&& (car lis)) (and (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
       ((eq? '|| (car lis)) (or (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
       ((eq? '!  (car lis)) (not (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
+      ((eq? 'true (car lis)) #t)
+      ((eq? 'false (car lis)) #f)
       (else (M_value lis state)))))
       
       
