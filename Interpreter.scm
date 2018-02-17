@@ -46,7 +46,8 @@
       (else (lookup (car lis) state)))))
 ;(M_value '(+ (* 3 x) 4) '((x) (5)))
 
-(define M_bolean
+;(M_boolean '(> (* x (+ x x)) y) ((x y) (3 50)))
+(define M_boolean
   (lambda (lis state)
     (cond
       ((null? lis) (error "input not a statement" lis))
@@ -54,6 +55,15 @@
       ((eq? '== (car lis)) (equals? (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
       ((eq? '!= (car lis)) (not (equals? (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state))))
       ((eq? '<  (car lis)) (< (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
+      ((eq? '>  (car lis)) (> (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
+      ((eq? '<= (car lis)) (<= (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
+      ((eq? '>= (car lis)) (>= (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
+      ((eq? '&& (car lis)) (and (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
+      ((eq? '|| (car lis)) (or (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
+      ((eq? '!  (car lis)) (not (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
+      (else (M_value lis state)))))
+      
+      
       
                   
 ;Getting the decimal value of a number represented with each digit as an element in a list
