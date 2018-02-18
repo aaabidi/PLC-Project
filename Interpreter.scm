@@ -66,9 +66,24 @@
       ((eq? '|| (car lis)) (or (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
       ((eq? '!  (car lis)) (not (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
       ((eq? 'true (car lis)) #t)
-      ((eq? 'false (car lis)) #f)i
+      ((eq? 'false (car lis)) #f)
       ;CHANGE THIS TO M_STATE WHEN THAT FUNCTION IS COMPLETED
       (else (M_value lis state)))))
+
+;Not sure about putting null in the stateassign
+(define M_state
+  (lambda (lis state)
+    (cond
+      ((null? lis) (error "input not a statement" lis))
+      ((list? (car lis)) (M_state (car lis) state))
+      ;Assignment
+      ((eq? 'var    (car lis)) (M_stateAssign state (cadr lis) null))
+      ;Works without assignment so it needs to be tweaked
+      ((eq? '=      (car lis)) (M_stateAssign state (cadr lis) (M_boolean (mlist (caddr lis)) state)))
+      ;return
+      ((eq? 'return (car lis)) (M_state state (cadr lis)))
+      
+      
       
                   
 ;Getting the decimal value of a number represented with each digit as an element in a list
