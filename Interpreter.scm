@@ -68,7 +68,6 @@
       ((eq? '!  (car lis)) (not (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
       ((eq? 'true (car lis)) #t)
       ((eq? 'false (car lis)) #f)
-      ;CHANGE THIS TO M_STATE WHEN THAT FUNCTION IS COMPLETED
       (else (M_state lis state)))))
 
 (define M_state
@@ -148,7 +147,8 @@
       ((eq? '|| (car lis)) #t)
       ((eq? '! (car lis)) #t)
       ((eq? 'true (car lis)) #t)
-      ((eq? 'false (car lis)) #t))))
+      ((eq? 'false (car lis)) #t)
+      (else #f))))
 
 
 (define toValue?
@@ -162,4 +162,5 @@
       ((eq? '% (car lis)) #t)
       ((eq? '+ (car lis)) #t)
       ((eq? '+ (car lis)) #t)
-      ((eq? '+ (car lis)) #t))))
+      ((eq? '+ (car lis)) #t)
+      (else #t))))
