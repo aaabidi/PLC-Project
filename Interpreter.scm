@@ -57,14 +57,14 @@
       ((null? lis) (error "input not a statement" lis))
       ((list? (car lis)) (M_boolean (car lis) state))
       ((eq? '== (car lis)) (equal? (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
-      ((eq? '!= (car lis)) (not (equal? (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state))))
-      ((eq? '<  (car lis)) (< (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
-      ((eq? '>  (car lis)) (> (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
-      ((eq? '<= (car lis)) (<= (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
-      ((eq? '>= (car lis)) (>= (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
-      ((eq? '&& (car lis)) (and (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
-      ((eq? '|| (car lis)) (or (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
-      ((eq? '!  (car lis)) (not (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
+      ((eq? '!= (car lis)) (not    (equal? (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state))))
+      ((eq? '<  (car lis)) (<      (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
+      ((eq? '>  (car lis)) (>      (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
+      ((eq? '<= (car lis)) (<=     (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
+      ((eq? '>= (car lis)) (>=     (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
+      ((eq? '&& (car lis)) (and    (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
+      ((eq? '|| (car lis)) (or     (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
+      ((eq? '!  (car lis)) (not    (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
       ((eq? 'true (car lis)) #t)
       ((eq? 'false (car lis)) #f)
       ;CHANGE THIS TO M_STATE WHEN THAT FUNCTION IS COMPLETED
@@ -76,12 +76,14 @@
     (cond
       ((null? lis) (error "input not a statement" lis))
       ((list? (car lis)) (M_state (car lis) state))
-      ;Assignment
-      ((eq? 'var    (car lis)) (M_stateAssign state (cadr lis) null))
+      ;Declaration mboolean needs to be changed to mstate?
+      ((and (equal? (length lis) 3) (eq? 'var    (car lis))) (M_stateAssign state (cadr lis) (M_boolean (mlist (caddr lis)) state)))
+      ;Null may need to change later
+      ((and (equal? (length lis) 2) (eq? 'var    (car lis))) (M_stateAssign state (cadr lis) null))
       ;Works without assignment so it needs to be tweaked
       ((eq? '=      (car lis)) (M_stateAssign state (cadr lis) (M_boolean (mlist (caddr lis)) state)))
       ;return
-      ((eq? 'return (car lis)) (M_state state (cadr lis)))
+      ((eq? 'return (car lis)) (M_state state (cadr lis))))))
       
       
       
