@@ -35,18 +35,18 @@
 (define M_value
   (lambda (lis state)
     (cond
-      ((null? lis) (error "input not a statement" lis))
-      ((list? (car lis)) (M_value (car lis) state))
-      ((number? (car lis)) (car lis))
-      ((and (eq? '- (car lis)) (eq? 2 (length lis))) (* -1 (M_value (mlist (cadr lis)) state)))
-      ((eq? '+ (car lis)) (+ (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
-      ((eq? '- (car lis)) (- (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
-      ((eq? '* (car lis)) (* (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
-      ((eq? '/ (car lis)) (/ (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
-      ((eq? '% (car lis)) (modulo (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
-      ;Check for a letter and then go to lookup, but the else case should go all the way back to M_state
-      (else (lookup (car lis) state)))))
-;(M_value '(+ (* 3 x) 4) '((x) (5)))
+    ((null? lis) (error "input not a statement" lis))
+    ((list? (car lis)) (M_state (car lis) state))
+    ((number? (car lis)) (car lis))
+    ((and (eq? '- (car lis)) (eq? 2 (length lis))) (* -1 (M_state (mlist (cadr lis)) state)))
+    ((eq? '+ (car lis)) (+ (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
+    ((eq? '- (car lis)) (- (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
+    ((eq? '* (car lis)) (* (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
+    ((eq? '/ (car lis)) (/ (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
+    ((eq? '% (car lis)) (modulo (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
+    ;Check for a letter and then go to lookup, but the else case should go all the way back to M_state
+    (else (lookup (car lis) state)))))
+;(M_state '(+ (* 3 x) 4) '((x) (5)))
 
 
 
@@ -56,20 +56,20 @@
   (lambda (lis state)
     (cond
       ((null? lis) (error "input not a statement" lis))
-      ((list? (car lis)) (M_boolean (car lis) state))
-      ((eq? '== (car lis)) (equal? (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
-      ((eq? '!= (car lis)) (not (equal? (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state))))
-      ((eq? '<  (car lis)) (< (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
-      ((eq? '>  (car lis)) (> (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
-      ((eq? '<= (car lis)) (<= (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
-      ((eq? '>= (car lis)) (>= (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
-      ((eq? '&& (car lis)) (and (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
-      ((eq? '|| (car lis)) (or (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
-      ((eq? '!  (car lis)) (not (M_boolean (mlist(cadr lis)) state) (M_boolean (mlist(caddr lis)) state)))
+      ((list? (car lis)) (M_state (car lis) state))
+      ((eq? '== (car lis)) (equal? (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
+      ((eq? '!= (car lis)) (not (equal? (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state))))
+      ((eq? '<  (car lis)) (< (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
+      ((eq? '>  (car lis)) (> (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
+      ((eq? '<= (car lis)) (<= (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
+      ((eq? '>= (car lis)) (>= (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
+      ((eq? '&& (car lis)) (and (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
+      ((eq? '|| (car lis)) (or (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
+      ((eq? '!  (car lis)) (not (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
       ((eq? 'true (car lis)) #t)
       ((eq? 'false (car lis)) #f)
       ;CHANGE THIS TO M_STATE WHEN THAT FUNCTION IS COMPLETED
-      (else (M_value lis state)))))
+      (else (M_state lis state)))))
 
 (define M_state
   (lambda (lis state)
@@ -81,20 +81,27 @@
       ;Null may need to change later
       ((and (equal? (length lis) 2) (eq? 'var    (car lis))) (M_stateAssign state (cadr lis) null))
       ;Works without assignment so it needs to be tweaked
-      ((eq? '=      (car lis)) (M_stateAssign state (cadr lis) (M_boolean (mlist (caddr lis)) state)))
+      ((eq? '=      (car lis)) (M_value (mlist (cadr lis)) (M_stateAssign state (cadr lis) (M_state (mlist (caddr lis)) state))))
       ;return
-      ((eq? 'return (car lis)) (M_state (cadr lis) state)))))
-      
-      
-      
-                  
+      ((eq? 'return (car lis)) (M_state (cadr lis) state))
+      ;if
+      ;while
+      ;toBoolean
+      ((toBoolean? lis) (M_boolean lis state))
+      ;toValue
+      ((toValue? lis) (M_value lis state))
+      )))
+
+
+
+
 ;Getting the decimal value of a number represented with each digit as an element in a list
 (define M_valNum
   (lambda (num)
     (cond
       ;returning 0 might be a bad idea
       ((null? num) '0)
-      (else (+ (MValNum (cdr num)) (* (car num) (expt 10 (- (length num) 1))))))))    
+      (else (+ (MValNum (cdr num)) (* (car num) (expt 10 (- (length num) 1))))))))
 ;Tests for M_valNum
 ;(M_valNum '())
 ;(M_valNum '(3 5 9))
@@ -131,29 +138,28 @@
   (lambda (lis)
     (cond
       ((null? lis) (error "input not a valid statement" lis))
-      ((eq? '== (car lis)) (#t))
-      ((eq? '!= (car lis)) (#t))
-      ((eq? '< (car lis)) (#t))
-      ((eq? '> (car lis)) (#t))
-      ((eq? '<= (car lis)) (#t))
-      ((eq? '>= (car lis)) (#t))
-      ((eq? '&& (car lis)) (#t))
-      ((eq? '|| (car lis)) (#t))
-      ((eq? '! (car lis)) (#t))
-      ((eq? 'true (car lis)) (#t))
-      ((eq? 'false (car lis)) (#t)))))
+      ((eq? '== (car lis)) #t)
+      ((eq? '!= (car lis)) #t)
+      ((eq? '< (car lis)) #t)
+      ((eq? '> (car lis)) #t)
+      ((eq? '<= (car lis)) #t)
+      ((eq? '>= (car lis)) #t)
+      ((eq? '&& (car lis)) #t)
+      ((eq? '|| (car lis)) #t)
+      ((eq? '! (car lis)) #t)
+      ((eq? 'true (car lis)) #t)
+      ((eq? 'false (car lis)) #t))))
 
 
 (define toValue?
   (lambda (lis)
     (cond
       ((null? lis) (error "input is not a valid speaker"))
-      ((eq? '+ (car lis)) (#t))
-      ((eq? '- (car lis)) (#t))
-      ((eq? '* (car lis)) (#t))
-      ((eq? '/ (car lis)) (#t))
-      ((eq? '% (car lis)) (#t))
-      ((eq? '+ (car lis)) (#t))
-      ((eq? '+ (car lis)) (#t))
-      ((eq? '+ (car lis)) (#t)))))
-      
+      ((eq? '+ (car lis)) #t)
+      ((eq? '- (car lis)) #t)
+      ((eq? '* (car lis)) #t)
+      ((eq? '/ (car lis)) #t)
+      ((eq? '% (car lis)) #t)
+      ((eq? '+ (car lis)) #t)
+      ((eq? '+ (car lis)) #t)
+      ((eq? '+ (car lis)) #t))))

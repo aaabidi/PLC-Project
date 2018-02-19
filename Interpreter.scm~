@@ -36,14 +36,14 @@
   (lambda (lis state)
     (cond
       ((null? lis) (error "input not a statement" lis))
-      ((list? (car lis)) (M_value (car lis) state))
+      ((list? (car lis)) (M_state (car lis) state))
       ((number? (car lis)) (car lis))
-      ((and (eq? '- (car lis)) (eq? 2 (length lis))) (* -1 M_value(mlist (cadr lis))))
-      ((eq? '+ (car lis)) (+ (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
-      ((eq? '- (car lis)) (- (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
-      ((eq? '* (car lis)) (* (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
-      ((eq? '/ (car lis)) (/ (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
-      ((eq? '% (car lis)) (modulo (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
+      ((and (eq? '- (car lis)) (eq? 2 (length lis))) (* -1 M_state(mlist (cadr lis))))
+      ((eq? '+ (car lis)) (+ (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
+      ((eq? '- (car lis)) (- (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
+      ((eq? '* (car lis)) (* (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
+      ((eq? '/ (car lis)) (/ (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
+      ((eq? '% (car lis)) (modulo (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
       ;Check for a letter and then go to lookup, but the else case should go all the way back to M_state
       (else (lookup (car lis) state)))))
 ;(M_value '(+ (* 3 x) 4) '((x) (5)))
@@ -83,17 +83,17 @@
       ((eq? '=      (car lis)) (M_stateAssign state (cadr lis) (M_boolean (mlist (caddr lis)) state)))
       ;return
       ((eq? 'return (car lis)) (M_state state (cadr lis)))
-      
-      
-      
-                  
+
+
+
+
 ;Getting the decimal value of a number represented with each digit as an element in a list
 (define M_valNum
   (lambda (num)
     (cond
       ;returning 0 might be a bad idea
       ((null? num) '0)
-      (else (+ (MValNum (cdr num)) (* (car num) (expt 10 (- (length num) 1))))))))    
+      (else (+ (MValNum (cdr num)) (* (car num) (expt 10 (- (length num) 1))))))))
 ;Tests for M_valNum
 ;(M_valNum '())
 ;(M_valNum '(3 5 9))
@@ -155,4 +155,3 @@
       ((eq? '+ (car lis)) (#t))
       ((eq? '+ (car lis)) (#t))
       ((eq? '+ (car lis)) (#t)))))
-      
