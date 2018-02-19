@@ -38,6 +38,7 @@
       ((null? lis) (error "input not a statement" lis))
       ((list? (car lis)) (M_value (car lis) state))
       ((number? (car lis)) (car lis))
+      ((and (eq? '- (car lis)) (eq? 2 (length lis))) (* -1 (M_value (mlist (cadr lis)) state)))
       ((eq? '+ (car lis)) (+ (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
       ((eq? '- (car lis)) (- (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
       ((eq? '* (car lis)) (* (M_value (mlist(cadr lis)) state) (M_value (mlist(caddr lis)) state)))
@@ -71,17 +72,17 @@
       (else (M_value lis state)))))
 
 ;Not sure about putting null in the stateassign
-(define M_state
-  (lambda (lis state)
-    (cond
-      ((null? lis) (error "input not a statement" lis))
-      ((list? (car lis)) (M_state (car lis) state))
-      ;Assignment
-      ((eq? 'var    (car lis)) (M_stateAssign state (cadr lis) null))
-      ;Works without assignment so it needs to be tweaked
-      ((eq? '=      (car lis)) (M_stateAssign state (cadr lis) (M_boolean (mlist (caddr lis)) state)))
-      ;return
-      ((eq? 'return (car lis)) (M_state state (cadr lis)))
+;(define M_state
+;  (lambda (lis state)
+;    (cond
+;      ((null? lis) (error "input not a statement" lis))
+;      ((list? (car lis)) (M_state (car lis) state))
+;      ;Assignment
+;      ((eq? 'var    (car lis)) (M_stateAssign state (cadr lis) null))
+;      ;Works without assignment so it needs to be tweaked
+;      ((eq? '=      (car lis)) (M_stateAssign state (cadr lis) (M_boolean (mlist (caddr lis)) state)))
+;      ;return
+;      ((eq? 'return (car lis)) (M_state state (cadr lis)))
       
       
       
