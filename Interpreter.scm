@@ -1,5 +1,12 @@
+(load "simpleParser.scm")
+
+(define M
+  (lambda (file)
+   (M_program (parser file) '(()()))))
+
+
 (define M_program
-  (lambda (lis)
+  (lambda (lis state)
     (cond
       ((not (null? lis)) ((M_state (car lis)) (M_program (cdr lis)))))))
 
