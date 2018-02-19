@@ -3,6 +3,7 @@
     (cond
       ((not (null? lis)) ((M_state (car lis)) (M_program (cdr lis)))))))
 
+
 (define M_state
   (lambda (lis state)
     (cond
@@ -20,6 +21,7 @@
       ((toBoolean? lis) (M_boolean lis state))
       (else (M_value lis state)))))
 
+
 ;(M_boolean '(> (* x (+ x x)) y) ((x y) (3 50)))
 ;(M_boolean '(== true (>= (+ 3 7) (+ 4 10))) '(()()))
 (define M_boolean
@@ -27,6 +29,7 @@
     (cond
       ((null? lis) (error "input not a statement" lis))
       ((list? (car lis)) (M_state (car lis) state))
+      ((eq? '!  (car lis)) ((not (M_state (mlist(cadr lis)) state)) (M_state (mlist(caddr lis)) state)))
       ((eq? '== (car lis)) (equal? (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
       ((eq? '!= (car lis)) (not (equal? (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state))))
       ((eq? '<  (car lis)) (< (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
@@ -35,7 +38,6 @@
       ((eq? '>= (car lis)) (>= (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
       ((eq? '&& (car lis)) (and (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
       ((eq? '|| (car lis)) (or (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
-      ((eq? '!  (car lis)) (not (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
       ((eq? 'true (car lis)) #t)
       ((eq? 'false (car lis)) #f)
       (else (M_state lis state)))))
