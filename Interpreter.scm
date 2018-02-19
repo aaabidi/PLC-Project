@@ -1,3 +1,9 @@
+(define M_program
+  (lambda (lis)
+    (cond
+      ((not (null? lis)) ((M_state (car lis)) (M_program (cdr lis)))))))
+
+
 ;"cdr" of the state
 (define nextInState
   (lambda (state)
