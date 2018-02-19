@@ -90,6 +90,7 @@
       ;return
       ((eq? 'return (car lis)) (M_state (cadr lis) state))
       ;if
+      ((or (eq? 'elseif (car lis)) (eq? 'if (car lis))) (M_state-if lis state))
       ;while
       ;toBoolean
       ((toBoolean? lis) (M_boolean lis state))
@@ -170,3 +171,32 @@
       ((eq? '+ (car lis)) #t)
       ((eq? '+ (car lis)) #t)
       (else #t))))
+
+
+;Conditional statement
+;Takes a list which is the entire if-else and the state
+(define MState-if
+  (lambda (lis state)
+    (if (M_boolean (if-condition lis) state)
+       (M_state (then lis) state)
+       (M_state (else* lis) state))))
+    
+
+;functions for determining which elements of a list (if statement) are the conditional and the lines to execute
+(define if-condition
+  (lambda (lis)
+    ((cadr lis))))
+
+(define then
+  (lambda(lis)
+    ((caddr lis))))
+
+(define else*
+  (lambda (lis)
+    ((cadddr lis))))
+
+;Loop
+;(define MState-While
+;  (lambda (condition ... ... state)
+;    (cond
+;      (MBool condition state)
