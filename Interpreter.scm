@@ -90,8 +90,9 @@
       ;return
       ((eq? 'return (car lis)) (M_state (cadr lis) state))
       ;if
-      ((or (eq? 'elseif (car lis)) (eq? 'if (car lis))) (M_state-if lis state))
+      ((eq? 'if (car lis)) (M_state-if lis state))
       ;while
+      ((eq? 'while (car lis)) (M_state-while lis state))
       ;toBoolean
       ((toBoolean? lis) (M_boolean lis state))
       ;toValue
@@ -195,8 +196,14 @@
   (lambda (lis)
     ((cadddr lis))))
 
-;Loop
-;(define MState-While
-;  (lambda (condition ... ... state)
-;    (cond
-;      (MBool condition state)
+;while loop
+;(caddr lis) is the loop body
+;(cadr lis) is the loop condition
+;executing the loop body changes the state. 
+
+(define M_state-while
+  (lambda (lis state)
+    (cond
+      ((M_boolean (cadr lis) state) (M_state-while lis (M_state (caddr lis) state)))
+      (else (cdddr lis)))))
+
