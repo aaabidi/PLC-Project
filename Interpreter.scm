@@ -6,28 +6,22 @@
     (M_state (parser file) '(()()))))
 
 
+
 (define M_state
   (lambda (lis state)
     (cond
       ((null? lis) state)
       ((list? (car lis)) (M_state (cdr lis) (M_state (car lis) state)))
-      ;Declaration mboolean needs to be changed to mstate?
-      ((and (equal? (length lis) 3) (eq? 'var    (car lis))) (M_stateAssign state (cadr lis) (M_boolean (mlist (caddr lis)) state)))
-      ;Null may need to change later
-      ((and (equal? (length lis) 2) (eq? 'var    (car lis))) (M_stateAssign state (cadr lis) null))
-      ;Works without assignment so it needs to be tweaked
-      ((eq? '=      (car lis)) (M_stateAssign state (cadr lis) (M_state (mlist (caddr lis)) state)))
-      ;return
+      ((and (equal? (length lis) 3) (eq? 'var (car lis))) (M_stateAssign state (cadr lis) (M_boolean (mlist (caddr lis)) state)))
+      ((and (equal? (length lis) 2) (eq? 'var (car lis))) (M_stateAssign state (cadr lis) null))
+      ((eq? '= (car lis)) (M_assign (cadr lis) (caddr lis) state))
       ((eq? 'return (car lis)) (lookup 'r (M_stateAssign state 'r (M_boolean (mlist (cadr lis)) state))))
-      ;if
       ((eq? 'if (car lis)) (M_state-if lis state))
-      ;while
       ((eq? 'while (car lis)) (M_state-while lis state))
-      ;toBoolean
+      ; if M_state doesn't know how to deal with it, check if M_boolean does
       ((toBoolean? lis) (M_boolean lis state))
-      ;toValue
-      (else (M_value lis state))
-      )))
+      ; if M_boolean can't evaluate the statment M_value must or it can't be evaluated
+      (else (M_value lis state)))))
 
 
 (define M_boolean
@@ -46,8 +40,8 @@
       ((eq? '!  (car lis)) (not (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
       ((eq? 'true (car lis)) #t)
       ((eq? 'false (car lis)) #f)
-      ;to M_state
-      (else (M_value lis state)))))
+      ; if M_boolean can't evaluate a statement send it to M_state to run through all options
+      (else (M_state lis state)))))
 
 
 (define M_value
@@ -62,8 +56,24 @@
     ((eq? '* (car lis)) (* (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
     ((eq? '/ (car lis)) (floor (/ (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state))))
     ((eq? '% (car lis)) (modulo (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
-    ;Check for a letter and then go to lookup, but the else case should go all the way back to M_state
     (else (lookup (car lis) state)))))
+
+
+(define M_assign
+  (lambda (var expr state)
+    (cond
+      ((declared var state) (M_stateAssign state var (M_state (mlist expr) state)))
+      (else (error "variable not declared" var)))))
+
+
+(define declared
+  (lambda (var state)
+    (cond
+      ((null? state) #f)
+      ((null? (car state)) #f)
+      ((eq? var (caar state)) #t)
+      (else (declared var (nextInState state))))))
+
 
 ;finds the value of a variable given a state
 (define lookup
@@ -99,12 +109,12 @@
   (lambda (state a b)
     (addToState (removeState a state) a b)))
 
-
+; puts an atom in a list -> necessary to avoid errors
 (define mlist
   (lambda (x)
     (cons x '())))
 
-
+; checks if a statement can be evaluated by M_boolean
 (define toBoolean?
   (lambda (lis)
     (cond
@@ -129,7 +139,7 @@
     (if (M_boolean (if-condition lis) state)
        (M_state (then lis) state)
        (M_state (else* lis) state))))
-    
+
 
 ;functions for determining which elements of a list (if statement) are the conditional and the lines to execute
 (define if-condition
@@ -147,11 +157,9 @@
 ;while loop
 ;(caddr lis) is the loop body
 ;(cadr lis) is the loop condition
-;executing the loop body changes the state. 
-
+;executing the loop body changes the state.
 (define M_state-while
   (lambda (lis state)
     (cond
       ((M_boolean (cadr lis) state) (M_state-while lis (M_state (caddr lis) state)))
       (else (cdddr lis)))))
-
