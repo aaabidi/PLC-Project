@@ -15,9 +15,9 @@
       ((and (equal? (length lis) 3) (eq? 'var (car lis))) (M_stateAssign state (cadr lis) (M_boolean (mlist (caddr lis)) state)))
       ((and (equal? (length lis) 2) (eq? 'var (car lis))) (M_stateAssign state (cadr lis) null))
       ((eq? '= (car lis)) (M_assign (cadr lis) (caddr lis) state))
-      ((eq? 'return (car lis)) (lookup 'r (M_stateAssign state 'r (M_boolean (mlist (cadr lis)) state))))
-      ((eq? 'if (car lis)) (M_state-if lis state))
-      ((eq? 'while (car lis)) (M_state-while lis state))
+      ((eq? 'return (car lis)) (boolChecker(lookup 'r (M_stateAssign state 'r (M_boolean (mlist (cadr lis)) state)))))
+      ((eq? 'if (car lis)) (M_if lis state))
+      ((eq? 'while (car lis)) (M_while lis state))
       ; if M_state doesn't know how to deal with it, check if M_boolean does
       ((toBoolean? lis) (M_boolean lis state))
       ; if M_boolean can't evaluate the statment M_value must or it can't be evaluated
@@ -37,7 +37,7 @@
       ((eq? '>= (car lis)) (>= (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
       ((eq? '&& (car lis)) (and (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
       ((eq? '|| (car lis)) (or (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
-      ((eq? '!  (car lis)) (not (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
+      ((eq? '!  (car lis)) (not (M_state (mlist(cadr lis)) state)))
       ((eq? 'true (car lis)) #t)
       ((eq? 'false (car lis)) #f)
       ; if M_boolean can't evaluate a statement send it to M_state to run through all options
@@ -80,6 +80,7 @@
   (lambda (name state)
     (cond
       ((null? (car state)) (error "Variable with specified name not found" name) )
+      ((and (equal? name (caar state)) (null? (caar (cdr state)))) (error "Variable not assigned a value" name))
       ((equal? name (caar state)) (caar (cdr state)))
       (else (lookup name (nextInState state))))))
 
@@ -132,34 +133,54 @@
       ((eq? 'false (car lis)) #t)
       (else #f))))
 
+(define M_while
+  (lambda (lis state)
+    (if (M_boolean (mlist (cadr lis)) state)
+        (M_while lis (M_state (mlist (caddr lis)) state))
+        (M_state '() state))))
+
 ;Conditional statement
 ;Takes a list which is the entire if-else and the state
-(define M_state-if
-  (lambda (lis state)
-    (if (M_boolean (if-condition lis) state)
-       (M_state (then lis) state)
-       (M_state (else* lis) state))))
+;(define M_state-if
+ ; (lambda (lis state)
+  ;  (if (M_boolean (if-condition lis) state)
+   ;    (M_state (then lis) state)
+    ;   (M_state (else* lis) state))))
 
 
 ;functions for determining which elements of a list (if statement) are the conditional and the lines to execute
-(define if-condition
-  (lambda (lis)
-    ((cadr lis))))
+;(define if-condition
+ ; (lambda (lis)
+  ;  ((cadr lis))))
 
-(define then
-  (lambda(lis)
-    ((caddr lis))))
+;(define then
+ ; (lambda(lis)
+  ;  ((caddr lis))))
 
-(define else*
-  (lambda (lis)
-    ((cadddr lis))))
+;(define else*
+ ; (lambda (lis)
+  ;  ((cadddr lis))))
 
 ;while loop
 ;(caddr lis) is the loop body
 ;(cadr lis) is the loop condition
 ;executing the loop body changes the state.
-(define M_state-while
+;(define M_state-while
+ ; (lambda (lis state)
+  ;  (cond
+   ;   ((M_boolean (cadr lis) state) (M_state-while lis (M_state (caddr lis) state)))
+    ;  (else (cdddr lis)))))
+
+(define M_if
   (lambda (lis state)
     (cond
-      ((M_boolean (cadr lis) state) (M_state-while lis (M_state (caddr lis) state)))
-      (else (cdddr lis)))))
+      ((M_boolean (cadr lis) state) (M_state (caddr lis) state))
+      ((eq? 3 (length lis)) state)
+      ((eq? 4 (length lis)) (M_state (cadddr lis) state)))))
+
+(define boolChecker
+  (lambda (x)
+    (cond
+      ((eq? #t x) 'true)
+      ((eq? #f x) 'false)
+      (else x))))
