@@ -60,7 +60,7 @@
     ((eq? '+ (car lis)) (+ (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
     ((eq? '- (car lis)) (- (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
     ((eq? '* (car lis)) (* (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
-    ((eq? '/ (car lis)) (/ (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
+    ((eq? '/ (car lis)) (floor (/ (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state))))
     ((eq? '% (car lis)) (modulo (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
     ;Check for a letter and then go to lookup, but the else case should go all the way back to M_state
     (else (lookup (car lis) state)))))
