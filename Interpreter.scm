@@ -1,28 +1,32 @@
 (load "simpleParser.scm")
 
+
 (define M
   (lambda (file)
    (M_program (parser file) '(()()))))
 
 
-(define M_program
-  (lambda (lis state)
-    (cond
-      ((not (null? lis)) ((M_state (car lis)) (M_program (cdr lis)))))))
+;(define M_program
+ ; (lambda (lis state)
+  ;  (cond
+   ;   ((not (null? lis)) ((M_state (car lis) state) (M_program (cdr lis) state))))))
 
 
 (define M_state
   (lambda (lis state)
     (cond
       ((null? lis) (error "input not a statement" lis))
-      ((list? (car lis)) (M_state (car lis) state))
+      ((list? (car lis)) (M_state (cdr lis) (M_state (car lis) state)))
+      ;((list? (car lis)) (M_state (car lis) state))
       ;Declaration mboolean needs to be changed to mstate?
       ((and (equal? (length lis) 3) (eq? 'var    (car lis))) (M_stateAssign state (cadr lis) (M_boolean (mlist (caddr lis)) state)))
       ;Null may need to change later
       ((and (equal? (length lis) 2) (eq? 'var    (car lis))) (M_stateAssign state (cadr lis) null))
       ;Works without assignment so it needs to be tweaked
-      ((eq? '=      (car lis)) (M_value (mlist (cadr lis)) (M_stateAssign state (cadr lis) (M_state (mlist (caddr lis)) state))))
-      ((eq? 'return (car lis)) (M_state (cadr lis) state))
+      ;((eq? '= (car lis)) (M_value (mlist (cadr lis)) (M_stateAssign state (cadr lis) (M_state (mlist (caddr lis)) state)))) - This one does nested assignment but messes up M_program
+      ((and (eq? '= (car lis)) (list? (caddr lis))) (M_state (cons '= (cons (cadr lis) (mlist (caddr lis)))) (M_state (mlist (caddr lis)) state) ))
+      ((eq? '= (car lis)) (M_stateAssign state (cadr lis) (M_state (mlist (caddr lis)) state)))
+      ((eq? 'return (car lis)) ((M_state (mlist(cadr lis)) state)))
       ((eq? 'if (car lis)) (M_state-if lis state))
       ((eq? 'while (car lis)) (M_state-while lis state))
       ((toBoolean? lis) (M_boolean lis state))
@@ -63,6 +67,7 @@
     ((eq? '* (car lis)) (* (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
     ((eq? '/ (car lis)) (/ (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
     ((eq? '% (car lis)) (modulo (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
+    ((eq? '= (car lis)) (M_state (mlist (caddr lis)) state))
     ;Check for a letter and then go to lookup, but the else case should go all the way back to M_state
     (else (lookup (car lis) state)))))
 ;(M_state '(+ (* 3 x) 4) '((x) (5)))
@@ -104,11 +109,6 @@
       (else (addToState (removeState x (nextInState state)) (caar state) (caadr state))))))
 
 
-(define mlist
-  (lambda (x)
-    (cons x '())))
-
-
 (define toBoolean?
   (lambda (lis)
     (cond
@@ -125,6 +125,12 @@
       ((eq? 'true (car lis)) #t)
       ((eq? 'false (car lis)) #t)
       (else #f))))
+
+
+
+(define mlist
+  (lambda (x)
+    (cons x '())))
 
 
 ;Conditional statement
