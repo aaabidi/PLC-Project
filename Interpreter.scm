@@ -1,12 +1,12 @@
 (load "simpleParser.scm")
 
-
+; runs the whole program e.g. (M "code.txt")
 (define M
   (lambda (file)
     (M_state (parser file) '(()()))))
 
 
-
+; controls variable declaration and assignment, if, while, and return statements
 (define M_state
   (lambda (lis state)
     (cond
@@ -23,7 +23,7 @@
       ; if M_boolean can't evaluate the statment M_value must or it can't be evaluated
       (else (M_value lis state)))))
 
-
+; computes logical boolean operations
 (define M_boolean
   (lambda (lis state)
     (cond
@@ -43,7 +43,7 @@
       ; if M_boolean can't evaluate a statement send it to M_state to run through all options
       (else (M_state lis state)))))
 
-
+; finds the value of arithemtic expressions and variables
 (define M_value
   (lambda (lis state)
     (cond
@@ -58,14 +58,14 @@
     ((eq? '% (car lis)) (modulo (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
     (else (lookup (car lis) state)))))
 
-
+; makes sure that variables that have not been declared cannot be assigned a value
 (define M_assign
   (lambda (var expr state)
     (cond
       ((declared var state) (M_stateAssign state var (M_state (mlist expr) state)))
       (else (error "variable not declared" var)))))
 
-
+; checks if a variable has been declared
 (define declared
   (lambda (var state)
     (cond
@@ -115,6 +115,7 @@
   (lambda (x)
     (cons x '())))
 
+
 ; checks if a statement can be evaluated by M_boolean
 (define toBoolean?
   (lambda (lis)
@@ -133,44 +134,14 @@
       ((eq? 'false (car lis)) #t)
       (else #f))))
 
+; controls while statements
 (define M_while
   (lambda (lis state)
     (if (M_boolean (mlist (cadr lis)) state)
         (M_while lis (M_state (mlist (caddr lis)) state))
         (M_state '() state))))
 
-;Conditional statement
-;Takes a list which is the entire if-else and the state
-;(define M_state-if
- ; (lambda (lis state)
-  ;  (if (M_boolean (if-condition lis) state)
-   ;    (M_state (then lis) state)
-    ;   (M_state (else* lis) state))))
-
-
-;functions for determining which elements of a list (if statement) are the conditional and the lines to execute
-;(define if-condition
- ; (lambda (lis)
-  ;  ((cadr lis))))
-
-;(define then
- ; (lambda(lis)
-  ;  ((caddr lis))))
-
-;(define else*
- ; (lambda (lis)
-  ;  ((cadddr lis))))
-
-;while loop
-;(caddr lis) is the loop body
-;(cadr lis) is the loop condition
-;executing the loop body changes the state.
-;(define M_state-while
- ; (lambda (lis state)
-  ;  (cond
-   ;   ((M_boolean (cadr lis) state) (M_state-while lis (M_state (caddr lis) state)))
-    ;  (else (cdddr lis)))))
-
+;controls if statements
 (define M_if
   (lambda (lis state)
     (cond
@@ -178,6 +149,7 @@
       ((eq? 3 (length lis)) state)
       ((eq? 4 (length lis)) (M_state (cadddr lis) state)))))
 
+; changed returned #t and #f to true and false
 (define boolChecker
   (lambda (x)
     (cond
