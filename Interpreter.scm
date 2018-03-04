@@ -4,7 +4,7 @@
 (define M
   (lambda (file)
     (M_state (parser file) '(()()))))
-
+;You use '(() ()) for initial state You have a very bare-bones use of abstraction functions. You have c[ad]*r calls scattered everywhere.
 
 ; controls variable declaration and assignment, if, while, and return statements
 (define M_state
@@ -70,8 +70,8 @@
   (lambda (var state)
     (cond
       ((null? state) #f)
-      ((null? (car state)) #f)
-      ((eq? var (caar state)) #t)
+      ((null? (listVars state)) #f)
+      ((eq? var (firstVar state)) #t)
       (else (declared var (nextInState state))))))
 
 
@@ -79,23 +79,40 @@
 (define lookup
   (lambda (name state)
     (cond
-      ((null? (car state)) (error "Variable with specified name not found" name) )
-      ((and (equal? name (caar state)) (null? (caar (cdr state)))) (error "Variable not assigned a value" name))
-      ((equal? name (caar state)) (caar (cdr state)))
+      ((null? (listVars state)) (error "Variable with specified name not found" name) )
+      ((and (equal? name (firstVar state)) (eq? 'nul (firstVal state))) (error "Variable not assigned a value" name))
+      ((equal? name (firstVar state)) (firstVal state))
       (else (lookup name (nextInState state))))))
 
+;All the variables in the state
+(define listVars
+  (lambda (state)
+    (car state)))
 
+;first variable in the state
+(define firstVar
+  (lambda (state)
+    (caar state)))
+;value of the first variable
+(define firstVal
+  (lambda (state)
+    (caadr state)))
+    
 ;"cdr" of the state
 (define nextInState
   (lambda (state)
     (cons (cdar state) (cons (cdr(cadr state)) '()))))
 
 
-;consing onto a state
+;adding a variable that has been assigned a value to a state
 (define addToState
   (lambda (state a b)
     (cons (cons a (car state)) (cons (cons b (cadr state)) '()))))
 
+;adding a variable that has been declared but not assigned
+(define addUnassigned
+  (lambda (state a)
+    (cons (cons a (car state)) (cons (cons 'nul (cadr state)) '()))))
 
 ;removing a variable from the state
 (define removeState
