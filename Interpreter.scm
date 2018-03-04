@@ -1,9 +1,9 @@
 (load "simpleParser.scm")
-
+(require racket/trace)
 ; runs the whole program e.g. (M "code.txt")
 (define M
   (lambda (file)
-    (M_state (parser file) '(()()))))
+    (M_state (parser file) '((()())))))
 ;You use '(() ()) for initial state You have a very bare-bones use of abstraction functions. You have c[ad]*r calls scattered everywhere.
 
 ; controls variable declaration and assignment, if, while, and return statements
@@ -69,25 +69,49 @@
 (define declared
   (lambda (var state)
     (cond
-      ((null? state) #f)
-      ((null? (listVars state)) #f)
-      ((eq? var (firstVar state)) #t)
-      (else (declared var (nextInState state))))))
-
+      ((and (null? (listVars (topLayer state))) (null? (removeLayer state))) #f)
+      ((null? (listVars (topLayer state))) (declared var (removeLayer state)))
+      ((eq? var (firstVar (topLayer state))) #t)
+      (else (declared var (cons (nextInState (topLayer state))(removeLayer state)))))))
+;Test state
+(define state
+  '(((a b c)(1 2 3))((x y z)(4 5 6)))) 
 
 ;finds the value of a variable given a state
 (define lookup
   (lambda (name state)
     (cond
-      ((null? (listVars state)) (error "Variable with specified name not found" name) )
-      ((and (equal? name (firstVar state)) (eq? 'nul (firstVal state))) (error "Variable not assigned a value" name))
-      ((equal? name (firstVar state)) (firstVal state))
-      (else (lookup name (nextInState state))))))
+      ((and (null? (listVars (topLayer state))) (null? (removeLayer state))) (error "Variable not declared" name))
+      ((null? (listVars (topLayer state))) (lookup name (removeLayer state)))
+      ((and (equal? name (firstVar (topLayer state))) (eq? 'nul (firstVal (topLayer state)))) (error "Variable not assigned a value" name))
+      ((equal? name (firstVar (topLayer state))) (firstVal (topLayer state)))
+      (else (lookup name (cons (nextInState (topLayer state))(removeLayer state)))))))
 
-;All the variables in the state
+;Adding a layer onto the state
+(define newLayer
+  (lambda (state)
+    (cons '(()()) state)))
+
+;The top layer on a state
+(define topLayer
+  (lambda(state)
+    (car state)))
+
+;The state without the top layer
+(define removeLayer
+  (lambda(state)
+    (cdr state)))
+
+
+;All the variables in the top layer of the state
 (define listVars
   (lambda (state)
-    (car state)))
+     (car state)))
+
+;All the values of the variables in the top layer of the state
+(define listVals
+  (lambda(state)
+    (cadr state)))
 
 ;first variable in the state
 (define firstVar
@@ -101,26 +125,27 @@
 ;"cdr" of the state
 (define nextInState
   (lambda (state)
-    (cons (cdar state) (cons (cdr(cadr state)) '()))))
+    (cons (cdar  state) (cons (cdr(cadr state)) '()))))
 
 
 ;adding a variable that has been assigned a value to a state
 (define addToState
   (lambda (state a b)
-    (cons (cons a (car state)) (cons (cons b (cadr state)) '()))))
+    (cons (cons (cons a (listVars (topLayer state))) (cons (cons b (listVals(topLayer state))) '()))(removeLayer state))))
 
 ;adding a variable that has been declared but not assigned
-(define addUnassigned
+(define declare
   (lambda (state a)
-    (cons (cons a (car state)) (cons (cons 'nul (cadr state)) '()))))
+    (cons (cons (cons a (listVars(topLayer state))) (cons (cons 'nul (listVals(topLayer state))) '()))(removeLayer state))))
 
 ;removing a variable from the state
 (define removeState
   (lambda (x state)
     (cond
-      ((null? (car state)) state)
-      ((eq? x (caar state)) (nextInState state))
-      (else (addToState (removeState x (nextInState state)) (caar state) (caadr state))))))
+      ((and (null? (listVars(topLayer state))) (null? (removeLayer state))) state)
+      ((null? (listVars(topLayer state))) (cons (topLayer state)(removeState x (removeLayer state))))
+      ((eq? x (firstVar (topLayer state))) (cons (nextInState(topLayer state))(removeLayer state)))
+      (else (addToState (removeState x (cons (nextInState(topLayer state))(removeLayer state))) (firstVar(topLayer state)) (firstVal(topLayer state)))))))
 
 ; adds a variable to the state
 (define M_stateAssign
