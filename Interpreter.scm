@@ -147,10 +147,21 @@
       ((eq? x (firstVar (topLayer state))) (cons (nextInState(topLayer state))(removeLayer state)))
       (else (addToState (removeState x (cons (nextInState(topLayer state))(removeLayer state))) (firstVar(topLayer state)) (firstVal(topLayer state)))))))
 
+;update a declared variable
+(define updateVar
+  (lambda (x y state)
+    (cond
+      ((and (null? (listVars(topLayer state))) (null? (removeLayer state))) state)
+      ((null? (listVars(topLayer state))) (cons (topLayer state)(updateVar x y (removeLayer state))))
+      ((eq? x (firstVar (topLayer state))) (addToState (cons (nextInState (topLayer state)) (removeLayer state)) x y))
+      (else (addToState (updateVar x y (cons (nextInState(topLayer state))(removeLayer state))) (firstVar(topLayer state)) (firstVal(topLayer state)))))))
+
 ; adds a variable to the state
 (define M_stateAssign
   (lambda (state a b)
-    (addToState (removeState a state) a b)))
+    (if (declared a state)
+        (updateVar a b state)
+        (addToState (removeState a state) a b))))
 
 ; puts an atom in a list -> necessary to avoid errors
 (define mlist
