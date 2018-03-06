@@ -12,51 +12,65 @@
     (cond
       ((null? lis) state)
       ((list? (car lis)) (M_state (cdr lis) (M_state (car lis) state)))
-      ((and (equal? (length lis) 3) (eq? 'var (car lis))) (M_stateAssign state (cadr lis) (M_boolean (mlist (caddr lis)) state)))
+      ((and (equal? (length lis) 3) (eq? 'var (car lis))) (M_stateAssign state (cadr lis) (M_booleanSecond lis state)))
       ((and (equal? (length lis) 2) (eq? 'var (car lis))) (M_stateAssign state (cadr lis) null))
-      ((eq? '= (car lis)) (M_assign (cadr lis) (caddr lis) state))
-      ((eq? 'return (car lis)) (boolChecker(lookup 'r (M_stateAssign state 'r (M_boolean (mlist (cadr lis)) state)))))
+      ((eq? '= (car lis)) (M_assign (cadr lis) (M_valueSecond lis state) state))
+      ((eq? 'return (car lis)) (boolChecker(lookup 'r (M_stateAssign state 'r (M_booleanFirst lis state)))))
       ((eq? 'if (car lis)) (M_if lis state))
-      ((eq? 'while (car lis)) (M_while lis state))
-      ; if M_state doesn't know how to deal with it, check if M_boolean does
-      ((toBoolean? lis) (M_boolean lis state))
-      ; if M_boolean can't evaluate the statment M_value must or it can't be evaluated
-      (else (M_value lis state)))))
+      ((eq? 'while (car lis)) (M_while lis state)))))
 
 ; computes logical boolean operations
 (define M_boolean
   (lambda (lis state)
     (cond
       ((null? lis) (error "input not a statement" lis))
-      ((list? (car lis)) (M_state (car lis) state))
-      ((eq? '== (car lis)) (equal? (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
-      ((eq? '!= (car lis)) (not (equal? (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state))))
-      ((eq? '<  (car lis)) (< (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
-      ((eq? '>  (car lis)) (> (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
-      ((eq? '<= (car lis)) (<= (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
-      ((eq? '>= (car lis)) (>= (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
-      ((eq? '&& (car lis)) (and (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
-      ((eq? '|| (car lis)) (or (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
-      ((eq? '!  (car lis)) (not (M_state (mlist(cadr lis)) state)))
+      ((list? (car lis)) (M_boolean (car lis) state))
+      ((eq? '== (car lis)) (equal? (M_booleanFirst lis state) (M_booleanSecond lis state)))
+      ((eq? '!= (car lis)) (not (equal? (M_booleanFirst lis state) (M_booleanSecond lis state))))
+      ((eq? '<  (car lis)) (< (M_booleanFirst lis state) (M_booleanSecond lis state)))
+      ((eq? '>  (car lis)) (> (M_booleanFirst lis state) (M_booleanSecond lis state)))
+      ((eq? '<= (car lis)) (<= (M_booleanFirst lis state) (M_booleanSecond lis state)))
+      ((eq? '>= (car lis)) (>= (M_booleanFirst lis state) (M_booleanSecond lis state)))
+      ((eq? '&& (car lis)) (and (M_booleanFirst lis state) (M_booleanSecond lis state)))
+      ((eq? '|| (car lis)) (or (M_booleanFirst lis state) (M_booleanSecond lis state)))
+      ((eq? '!  (car lis)) (not (M_booleanFirst lis state)))
       ((eq? 'true (car lis)) #t)
-      ((eq? 'false (car lis)) #f)
-      ; if M_boolean can't evaluate a statement send it to M_state to run through all options
-      (else (M_state lis state)))))
+      ((eq? 'false (car lis)) #f))))
+
+;Helper Method to Abstract M_boolean: gets the first thing to be evaluated in a comparison
+(define M_booleanFirst
+  (lambda lis state
+    (M_boolean (mlist (cadr lis)) state)))
+
+;Helper Method to Abstract M_boolean: gets the second thing to be evaluated in a comparison
+(define M_booleanSecond
+  (lambda lis state
+    (M_boolean (mlist (caddr lis)) state)))
 
 ; finds the value of arithemtic expressions and variables
 (define M_value
   (lambda (lis state)
     (cond
     ((null? lis) (error "input not a statement" lis))
-    ((list? (car lis)) (M_state (car lis) state))
+    ((list? (car lis)) (M_value (car lis) state))
     ((number? (car lis)) (car lis))
-    ((and (eq? '- (car lis)) (eq? 2 (length lis))) (* -1 (M_state (mlist (cadr lis)) state)))
-    ((eq? '+ (car lis)) (+ (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
-    ((eq? '- (car lis)) (- (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
-    ((eq? '* (car lis)) (* (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
-    ((eq? '/ (car lis)) (floor (/ (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state))))
-    ((eq? '% (car lis)) (modulo (M_state (mlist(cadr lis)) state) (M_state (mlist(caddr lis)) state)))
+    ((and (eq? '- (car lis)) (eq? 2 (length lis))) (* -1 (M_valueFirst lis state)))
+    ((eq? '+ (car lis)) (+ (M_valueFirst lis state) (M_valueSecond lis state)))
+    ((eq? '- (car lis)) (- ((M_valueFirst lis state) (M_valueSecond lis state))))
+    ((eq? '* (car lis)) (* (M_valueFirst lis state) (M_valueSecond lis state)))
+    ((eq? '/ (car lis)) (floor (/ (M_valueFirst lis state) (M_valueSecond lis state))))
+    ((eq? '% (car lis)) (modulo (M_valueFirst lis state) (M_valueSecond lis state)))
     (else (lookup (car lis) state)))))
+
+;Helper Method to Abstract M_value: gets the first thing to be evaluated in an operation
+(define M_valueFirst
+  (lambda (lis state)
+    (M_value (mlist (cadr lis)) state)))
+
+;Helper Method to Abstract M_value: gets the second thing to be evaluated in an operation
+(define M_valueSecond
+  (lambda (lis state)
+    (M_value (mlist (caddr lis)) state)))
 
 ; makes sure that variables that have not been declared cannot be assigned a value
 (define M_assign
