@@ -12,13 +12,22 @@
     (cond
       ((null? lis) state)
       ((list? (car lis)) (M_state (cdr lis) (M_state (car lis) state)))
-      ((and (equal? (length lis) 3) (eq? 'var (car lis))) (M_stateAssign state (cadr lis) (M_booleanSecond lis state)))
-      ((and (equal? (length lis) 2) (eq? 'var (car lis))) (M_stateAssign state (cadr lis) null))
+      ((and (equal? (length lis) 3) (eq? 'var (car lis))) (M_stateAssign state (cadr lis) (M_assign* lis state)))
+      ((and (equal? (length lis) 2) (eq? 'var (car lis))) (M_stateAssign state (cadr lis) 'nul))
       ((eq? '= (car lis)) (M_assign (cadr lis) (M_valueSecond lis state) state))
-      ((eq? 'return (car lis)) (boolChecker(lookup 'r (M_stateAssign state 'r (M_booleanFirst lis state)))))
+      ((eq? 'return (car lis))(M_stateReturn lis state))
       ((eq? 'if (car lis)) (M_if lis state))
       ((eq? 'while (car lis)) (M_while lis state)))))
 
+
+(define M_assign*
+  (lambda (lis state)
+    (cond
+      ((null? lis) error "input not a valid statement" lis)
+      ((toBoolean? lis) (M_boolean (mlist(caddr lis)) state))
+      (else (M_value (mlist(caddr lis)) state)))))
+;(M_booleanSecond lis state)
+;(boolChecker(lookup 'r (M_stateAssign state 'r (M_booleanFirst lis state))))
 ; computes logical boolean operations
 (define M_boolean
   (lambda (lis state)
@@ -37,6 +46,16 @@
       ((eq? 'true (car lis)) #t)
       ((eq? 'false (car lis)) #f))))
 
+;lis: (return (+ 4 5))
+
+
+(define M_stateReturn
+  (lambda (lis state)
+    (cond
+      ((number? lis) lis)
+      ((not(list? lis)) (lookup lis state))
+      ((toBoolean? lis) (lookup 'toReturn (M_stateAssign state 'toReturn (M_boolean (cdr lis) state))))
+      (else (lookup 'toReturn (M_stateAssign state 'toReturn (M_value (cdr lis) state)))))))
 ;Helper Method to Abstract M_boolean: gets the first thing to be evaluated in a comparison
 (define M_booleanFirst
   (lambda lis state
