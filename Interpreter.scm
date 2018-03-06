@@ -17,7 +17,7 @@
       ((eq? '= (car lis)) (M_assign (cadr lis) (M_valueSecond lis state) state))
       ((eq? 'return (car lis))(M_stateReturn lis state))
       ((eq? 'if (car lis)) (M_if lis state))
-      ((eq? 'while (car lis)) (M_while lis state)))))
+      ((eq? 'while (car lis)) (M_while lis state (lambda (v) v) (lambda (v) (M_while lis v break continue)))))))
 
 
 (define M_assign*
@@ -222,10 +222,13 @@
 
 ; controls while statements
 (define M_while
-  (lambda (lis state)
-    (if (M_boolean (mlist (cadr lis)) state)
-        (M_while lis (M_state (mlist (caddr lis)) state))
-        (M_state '() state))))
+   (lambda (lis state break continue)
+     (cond
+       ((equal? 'break (car lis)) (break (M_while '() state)))
+       ((equal? 'continue (car lis)) (continue (M_while '() state)))
+       ((M_boolean (mlist (cadr lis) state)) (M_while lis (M_state (mlist (caddr lis) state))))
+       (else (M_state '() state))
+       )))
 
 ;controls if statements
 (define M_if
