@@ -1,4 +1,4 @@
-(load "simpleParser.scm")
+
 (require racket/trace)
 ; runs the whole program e.g. (M "code.txt")
 (define M
@@ -15,7 +15,7 @@
       ((and (equal? (length lis) 3) (eq? 'var (car lis))) (M_stateAssign state (cadr lis) (M_assign* lis state)))
       ((and (equal? (length lis) 2) (eq? 'var (car lis))) (M_stateAssign state (cadr lis) 'nul))
       ((eq? '= (car lis)) (M_assign (cadr lis) (M_valueSecond lis state) state))
-      ((eq? 'return (car lis))(M_stateReturn lis state))
+      ((eq? 'return (car lis)) (M_stateReturn (cadr lis) state))
       ((eq? 'if (car lis)) (M_if lis state))
       ((eq? 'while (car lis)) (M_while lis state (lambda (v) v) (lambda (v) (M_while lis v break continue)))))))
 
@@ -36,10 +36,10 @@
       ((list? (car lis)) (M_boolean (car lis) state))
       ((eq? '== (car lis)) (equal? (M_booleanFirst lis state) (M_booleanSecond lis state)))
       ((eq? '!= (car lis)) (not (equal? (M_booleanFirst lis state) (M_booleanSecond lis state))))
-      ((eq? '<  (car lis)) (< (M_booleanFirst lis state) (M_booleanSecond lis state)))
-      ((eq? '>  (car lis)) (> (M_booleanFirst lis state) (M_booleanSecond lis state)))
-      ((eq? '<= (car lis)) (<= (M_booleanFirst lis state) (M_booleanSecond lis state)))
-      ((eq? '>= (car lis)) (>= (M_booleanFirst lis state) (M_booleanSecond lis state)))
+      ((eq? '<  (car lis)) (< (M_valueFirst lis state) (M_valueSecond lis state)))
+      ((eq? '>  (car lis)) (> (M_valueFirst lis state) (M_valueSecond lis state)))
+      ((eq? '<= (car lis)) (<= (M_valueFirst lis state) (M_valueSecond lis state)))
+      ((eq? '>= (car lis)) (>= (M_valueFirst lis state) (M_valueSecond lis state)))
       ((eq? '&& (car lis)) (and (M_booleanFirst lis state) (M_booleanSecond lis state)))
       ((eq? '|| (car lis)) (or (M_booleanFirst lis state) (M_booleanSecond lis state)))
       ((eq? '!  (car lis)) (not (M_booleanFirst lis state)))
@@ -54,8 +54,9 @@
     (cond
       ((number? lis) lis)
       ((not(list? lis)) (lookup lis state))
-      ((toBoolean? lis) (lookup 'toReturn (M_stateAssign state 'toReturn (M_boolean (cdr lis) state))))
-      (else (lookup 'toReturn (M_stateAssign state 'toReturn (M_value (cdr lis) state)))))))
+      ((and (toBoolean? lis) (eq? #t (lookup 'toReturn (M_stateAssign state 'toReturn (M_boolean lis state))))) 'true)
+      ((and (toBoolean? lis) (eq? #f (lookup 'toReturn (M_stateAssign state 'toReturn (M_boolean lis state))))) 'false)
+      (else (lookup 'toReturn (M_stateAssign state 'toReturn (M_value lis state)))))))
 ;Helper Method to Abstract M_boolean: gets the first thing to be evaluated in a comparison
 (define M_booleanFirst
   (lambda lis state
@@ -95,7 +96,8 @@
 (define M_assign
   (lambda (var expr state)
     (cond
-      ((declared var state) (M_stateAssign state var (M_state (mlist expr) state)))
+      ((and (eq? (toBoolean? (mlist expr)) #t) (declared var state)) (M_stateAssign state var (M_boolean (mlist expr) state)))
+      ((and (eq? (toBoolean? (mlist expr)) #f) (declared var state)) (M_stateAssign state var (M_value (mlist expr) state)))
       (else (error "variable not declared" var)))))
 
 ; checks if a variable has been declared
@@ -238,10 +240,4 @@
       ((eq? 3 (length lis)) state)
       ((eq? 4 (length lis)) (M_state (cadddr lis) state)))))
 
-; changed returned #t and #f to true and false
-(define boolChecker
-  (lambda (x)
-    (cond
-      ((eq? #t x) 'true)
-      ((eq? #f x) 'false)
-      (else x))))
+
