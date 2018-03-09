@@ -1,31 +1,49 @@
+(load "simpleParser.scm")
 
 (require racket/trace)
 ; runs the whole program e.g. (M "code.txt")
 (define M
   (lambda (file)
-    (M_state (parser file) '((()())))))
+    (call/cc
+     (lambda (return)
+       (M_state (parser file) '((()())) return (lambda (v) v))))))
 ;You use '(() ()) for initial state You have a very bare-bones use of abstraction functions. You have c[ad]*r calls scattered everywhere.
 
 ; controls variable declaration and assignment, if, while, and return statements
 (define M_state
-  (lambda (lis state)
+  (lambda (lis state return break)
     (cond
       ((null? lis) state)
-      ((list? (car lis)) (M_state (cdr lis) (M_state (car lis) state)))
-      ((and (equal? (length lis) 3) (eq? 'var (car lis))) (M_stateAssign state (cadr lis) (M_assign* lis state)))
+      ((list? (car lis)) (M_state (cdr lis) (M_state (car lis) state return break) return break))
+      ((and (equal? (length lis) 3) (eq? 'var (car lis))) (M_stateAssign state (cadr lis) (assignvalorbool lis state)))
       ((and (equal? (length lis) 2) (eq? 'var (car lis))) (M_stateAssign state (cadr lis) 'nul))
-      ((eq? '= (car lis)) (M_assign (cadr lis) (M_valueSecond lis state) state))
-      ((eq? 'return (car lis)) (M_stateReturn (cadr lis) state))
-      ((eq? 'if (car lis)) (M_if lis state))
-      ((eq? 'while (car lis)) (M_while lis state (lambda (v) v) (lambda (v) (M_while lis v break continue)))))))
+      ((eq? '= (car lis)) (M_stateAssign state (cadr lis) (assignvalorbool lis state)))
+      ((eq? 'return (car lis)) (return (returnvalorbool lis state)))
+      ((eq? 'if (car lis)) (M_if lis state return break))
+      ((eq? 'while (car lis)) (M_while (cadr lis) (caddr lis) state return))
+      ((eq? 'break (car lis)) (break state))
+      ((eq? 'begin (car lis)) (M_stateBlock (cdr lis) state return break)))))
 
 
-(define M_assign*
+;decides whether to assign something a value or a boolean
+(define assignvalorbool
   (lambda (lis state)
     (cond
       ((null? lis) error "input not a valid statement" lis)
-      ((toBoolean? lis) (M_boolean (mlist(caddr lis)) state))
+      ((toBoolean? (mlist (caddr lis))) (M_boolean (mlist(caddr lis)) state))
       (else (M_value (mlist(caddr lis)) state)))))
+
+;decides whether to return a value or a boolean
+(define returnvalorbool
+  (lambda (lis state)
+    (cond
+      ((null? lis) error "input not  a valid statement" lis)
+      ((toBoolean? (cdr lis)) (M_boolean (cdr lis) state))
+      (else (M_value (cdr lis) state)))))
+  
+
+
+
 ;(M_booleanSecond lis state)
 ;(boolChecker(lookup 'r (M_stateAssign state 'r (M_booleanFirst lis state))))
 ; computes logical boolean operations
@@ -34,7 +52,7 @@
     (cond
       ((null? lis) (error "input not a statement" lis))
       ((list? (car lis)) (M_boolean (car lis) state))
-      ((eq? '== (car lis)) (equal? (M_booleanFirst lis state) (M_booleanSecond lis state)))
+      ((eq? '== (car lis)) (equal? (M_valueFirst lis state) (M_valueSecond lis state)))
       ((eq? '!= (car lis)) (not (equal? (M_booleanFirst lis state) (M_booleanSecond lis state))))
       ((eq? '<  (car lis)) (< (M_valueFirst lis state) (M_valueSecond lis state)))
       ((eq? '>  (car lis)) (> (M_valueFirst lis state) (M_valueSecond lis state)))
@@ -48,15 +66,10 @@
 
 ;lis: (return (+ 4 5))
 
-
-(define M_stateReturn
-  (lambda (lis state)
-    (cond
-      ((number? lis) lis)
-      ((not(list? lis)) (lookup lis state))
-      ((and (toBoolean? lis) (eq? #t (lookup 'toReturn (M_stateAssign state 'toReturn (M_boolean lis state))))) 'true)
-      ((and (toBoolean? lis) (eq? #f (lookup 'toReturn (M_stateAssign state 'toReturn (M_boolean lis state))))) 'false)
-      (else (lookup 'toReturn (M_stateAssign state 'toReturn (M_value lis state)))))))
+(define M_stateBlock
+  (lambda (lis state return break)
+    (removeLayer (M_state lis (newLayer state) return break))))
+  
 ;Helper Method to Abstract M_boolean: gets the first thing to be evaluated in a comparison
 (define M_booleanFirst
   (lambda lis state
@@ -76,7 +89,7 @@
     ((number? (car lis)) (car lis))
     ((and (eq? '- (car lis)) (eq? 2 (length lis))) (* -1 (M_valueFirst lis state)))
     ((eq? '+ (car lis)) (+ (M_valueFirst lis state) (M_valueSecond lis state)))
-    ((eq? '- (car lis)) (- ((M_valueFirst lis state) (M_valueSecond lis state))))
+    ((eq? '- (car lis)) (- (M_valueFirst lis state) (M_valueSecond lis state)))
     ((eq? '* (car lis)) (* (M_valueFirst lis state) (M_valueSecond lis state)))
     ((eq? '/ (car lis)) (floor (/ (M_valueFirst lis state) (M_valueSecond lis state))))
     ((eq? '% (car lis)) (modulo (M_valueFirst lis state) (M_valueSecond lis state)))
@@ -223,21 +236,35 @@
       (else #f))))
 
 ; controls while statements
-(define M_while
-   (lambda (lis state break continue)
+;(define M_while
+;   (lambda (lis state break continue)
+;     (cond
+;       ((equal? 'break (car lis)) (break (M_while '() state)))
+;       ((equal? 'continue (car lis)) (continue (M_while '() state)))
+;       ((M_boolean (mlist (cadr lis)) state) (M_state lis (M_state (mlist (caddr lis)) state)))
+;       (else (M_state '() state))
+;       )))
+
+; controls while statements
+(define M_whileHelper
+   (lambda (myCond body state return break)
      (cond
-       ((equal? 'break (car lis)) (break (M_while '() state)))
-       ((equal? 'continue (car lis)) (continue (M_while '() state)))
-       ((M_boolean (mlist (cadr lis) state)) (M_while lis (M_state (mlist (caddr lis) state))))
-       (else (M_state '() state))
+       ((M_boolean myCond state) (M_whileHelper myCond body (M_state body state return break) return break))
+       (else state)
        )))
 
+(define M_while
+  (lambda (myCond body state return)
+    (call/cc
+     (lambda(break)
+       (M_whileHelper myCond body state return break)))))
+       
 ;controls if statements
 (define M_if
-  (lambda (lis state)
+  (lambda (lis state return break)
     (cond
-      ((M_boolean (cadr lis) state) (M_state (caddr lis) state))
+      ((M_boolean (cadr lis) state) (M_state (caddr lis) state return break))
       ((eq? 3 (length lis)) state)
-      ((eq? 4 (length lis)) (M_state (cadddr lis) state)))))
+      ((eq? 4 (length lis)) (M_state (cadddr lis) state return break)))))
 
 
