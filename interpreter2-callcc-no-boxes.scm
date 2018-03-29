@@ -32,8 +32,8 @@
 (define interpret-statement
   (lambda (statement environment return break continue throw)
     (cond
-      ((eq? 'function (statement-type statement)) (interpret-funDec statement))
-      ((eq? 'funcall (statement-type statement)) (interpret-funCall statement environment return))
+      ;((eq? 'function (statement-type statement)) (interpret-funDec statement))
+      ;((eq? 'funcall (statement-type statement)) (interpret-funCall statement environment return))
       ((eq? 'return (statement-type statement)) (interpret-return statement environment return))
       ((eq? 'var (statement-type statement)) (interpret-declare statement environment))
       ((eq? '= (statement-type statement)) (interpret-assign statement environment))
@@ -46,12 +46,12 @@
       ((eq? 'try (statement-type statement)) (interpret-try statement environment return break continue throw))
       (else (myerror "Unknown statement:" (statement-type statement))))))
 
-(define create-closure
-  (λ (funLis)
-    (n
+;(define create-closure
+ ; (λ (funLis)
+  ;  (n
 
-(define interpret-functionDec
-  (λ ()
+;(define interpret-functionDec
+ ; (λ ()
 
 ; Calls the return continuation with the given expression value
 (define interpret-return
