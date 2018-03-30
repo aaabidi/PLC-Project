@@ -1,6 +1,6 @@
 ; If you are using racket instead of scheme, uncomment these two lines, comment the (load "simpleParser.scm") and uncomment the (require "simpleParser.scm")
-; #lang racket
-; (require "simpleParser.scm")
+;#lang racket
+;(require "simpleParser.scm")
 (load "simpleParser.scm")
 
 
@@ -157,6 +157,7 @@
   (lambda (expr environment)
     (cond
       ((number? expr) expr)
+      ((eq? expr 'novalue) expr)
       ((eq? expr 'true) #t)
       ((eq? expr 'false) #f)
       ((not (list? expr)) (lookup expr environment))
@@ -361,7 +362,7 @@
 (define update-in-frame-store
   (lambda (var val varlist vallist)
     (cond
-      ((eq? var (car varlist)) (cons (box (scheme->language  val)) (cdr vallist)))
+      ((eq? var (car varlist))(begin (set-box! (car vallist) (scheme->language val)) (cons (car vallist) (cdr vallist))))
       (else (cons (car vallist) (update-in-frame-store var val (cdr varlist) (cdr vallist)))))))
 
 ; Returns the list of variables from a frame

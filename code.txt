@@ -1,2 +1,5 @@
-var x = 10;
-function main() {
+var x;
+x = 10;
+var y; 
+y = 2;
+var z = 4;
