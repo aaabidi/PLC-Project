@@ -1,7 +1,7 @@
 ; If you are using racket instead of scheme, uncomment these two lines, comment the (load "simpleParser.scm") and uncomment the (require "simpleParser.scm")
 ;#lang racket
 ;(require "simpleParser.scm")
-(load "simpleParser.scm")
+(load "functionParser.scm")
 
 
 ; An interpreter for the simple language that uses call/cc for the continuations.  Does not handle side effects.
@@ -46,18 +46,32 @@
       ((eq? 'try (statement-type statement)) (interpret-try statement environment return break continue throw))
       (else (myerror "Unknown statement:" (statement-type statement))))))
 
-
 ;(define create-closure
  ; (λ (funLis)
   ;  (n
 
-;(define interpret-functionDec
- ; (λ ()
+(define create-closure
+  (λ (functionList environment)
+    (list (get-funcParam functionList) (get-funcBody statementlist) (create-environment statementlist environment))))
+
+(define get-funcName
+  (lambda (functionList)
+    (cadr functionList)))
+
+(define get-funcParam
+  (lambda (functionList)
+    (caddr functionList)))
+
+(define get-funcBody
+  (lambda (functionList)
+  (cadddr functionList)))
 
 ; Calls the return continuation with the given expression value
 (define interpret-return
   (lambda (statement environment return)
     (return (eval-expression (get-expr statement) environment))))
+
+
 
 ; Adds a new variable binding to the environment.  There may be an assignment with the variable
 (define interpret-declare
@@ -112,16 +126,16 @@
 (define create-throw-catch-continuation
   (lambda (catch-statement environment return break continue throw jump finally-block)
     (cond
-      ((null? catch-statement) (lambda (ex env) (throw ex (interpret-block finally-block env return break continue throw)))) 
+      ((null? catch-statement) (lambda (ex env) (throw ex (interpret-block finally-block env return break continue throw))))
       ((not (eq? 'catch (statement-type catch-statement))) (myerror "Incorrect catch statement"))
       (else (lambda (ex env)
               (jump (interpret-block finally-block
-                                     (pop-frame (interpret-statement-list 
-                                                 (get-body catch-statement) 
+                                     (pop-frame (interpret-statement-list
+                                                 (get-body catch-statement)
                                                  (insert (catch-var catch-statement) ex (push-frame env))
-                                                 return 
-                                                 (lambda (env2) (break (pop-frame env2))) 
-                                                 (lambda (env2) (continue (pop-frame env2))) 
+                                                 return
+                                                 (lambda (env2) (break (pop-frame env2)))
+                                                 (lambda (env2) (continue (pop-frame env2)))
                                                  (lambda (v env2) (throw v (pop-frame env2)))))
                                      return break continue throw)))))))
 
@@ -240,7 +254,6 @@
   (lambda (catch-statement)
     (car (operand1 catch-statement))))
 
-
 ;------------------------
 ; Environment/State Functions
 ;------------------------
@@ -289,7 +302,7 @@
 (define lookup
   (lambda (var environment)
     (lookup-variable var environment)))
-  
+
 ; A helper function that does the lookup.  Returns an error if the variable does not have a legal value
 (define lookup-variable
   (lambda (var environment)
@@ -379,8 +392,8 @@
 ; Functions to convert the Scheme #t and #f to our languages true and false, and back.
 
 (define language->scheme
-  (lambda (v) 
-    (cond 
+  (lambda (v)
+    (cond
       ((eq? v 'false) #f)
       ((eq? v 'true) #t)
       (else v))))
