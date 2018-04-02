@@ -46,25 +46,39 @@
       ((eq? 'try (statement-type statement)) (interpret-try statement environment return break continue throw))
       (else (myerror "Unknown statement:" (statement-type statement))))))
 
-;(define create-closure
- ; (λ (funLis)
-  ;  (n
+;Adds a function binding to its closure
+(define addFunctionBinding
+  (lambda (funcitonDec state)
+    (insert (get-funcName functionDec) (create-closure functionDec state) state)))
 
+;Creates a closure for the function list input
 (define create-closure
   (λ (functionList environment)
-    (list (get-funcParam functionList) (get-funcBody statementlist) (create-environment statementlist environment))))
+    (list (get-funcParam functionList) (get-funcBody functionList) (lambda (bigstate) (create-environment-correct (get-funcName functionList) bigstate)))))
 
+;Returns the function name from a function list input
 (define get-funcName
   (lambda (functionList)
     (cadr functionList)))
 
+;Returns the parameter list from the function list input
 (define get-funcParam
   (lambda (functionList)
     (caddr functionList)))
 
+;Returns the body from the function list input
 (define get-funcBody
   (lambda (functionList)
   (cadddr functionList)))
+
+;Creates an environment for the function name and the overall state
+(define create-environment-correct
+  (λ (functionName BigState)
+    (cond
+      ((exists? functionName (topFrame BigState)) BigState)
+      (else (create-environment-correct functionName (pop-frame BigState))))))
+
+
 
 ; Calls the return continuation with the given expression value
 (define interpret-return
@@ -419,4 +433,4 @@
                             (makestr (string-append str (string-append " " (symbol->string (car vals)))) (cdr vals))))))
       (error-break (display (string-append str (makestr "" vals)))))))
 
-(interpret "code.txt")
+(parser "code.txt")
