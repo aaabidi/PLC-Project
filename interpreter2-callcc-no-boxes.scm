@@ -3,7 +3,6 @@
 ;(require "simpleParser.scm")
 (load "functionParser.scm")
 
-
 ; An interpreter for the simple language that uses call/cc for the continuations.  Does not handle side effects.
 ;(define call/cc call-with-current-continuation)
 
@@ -17,8 +16,9 @@
     (scheme->language
      (call/cc
       (lambda (return)
-        (interpret-statement-list (parser file) (newenvironment) return
+        (interpret-statement-list '((funcall main ())) (interpret-statement-list (parser file) (newenvironment) return
                                   (lambda (env) (myerror "Break used outside of loop")) (lambda (env) (myerror "Continue used outside of loop"))
+                                  (lambda (v env) (myerror "Uncaught exception thrown"))) return (lambda (env) (myerror "Break used outside of loop")) (lambda (env) (myerror "Continue used outside of loop"))
                                   (lambda (v env) (myerror "Uncaught exception thrown"))))))))
 
 ; interprets a list of statements.  The environment from each statement is used for the next ones.
@@ -33,7 +33,7 @@
   (lambda (statement environment return break continue throw)
     (cond
       ((eq? 'function (statement-type statement)) (addFunctionBinding statement environment return break continue throw))
-      ((eq? 'funcall (statement-type statement)) (interpret-state-funCall statement environment return break continue throw))
+      ((eq? 'funcall (statement-type statement)) (interpret-state-funccall statement environment return break continue throw))
       ((eq? 'return (statement-type statement)) (interpret-return statement environment return))
       ((eq? 'var (statement-type statement)) (interpret-declare statement environment))
       ((eq? '= (statement-type statement)) (interpret-assign statement environment))
@@ -75,22 +75,27 @@
 (define create-environment-correct
   (λ (functionName BigState)
     (cond
-      ((exists? functionName (topFrame BigState)) BigState)
+      ((exists-in-list? functionName (variables (topframe BigState))) BigState)
       (else (create-environment-correct functionName (pop-frame BigState))))))
 
 (define interpret-state-funccall
   (lambda (funccall state return break continue throw)
-    (begin (Mvalue funccall state return break continue throw) state)))
+    (begin (interpret-value-funccall funccall state return break continue throw) state)))
 
 (define interpret-value-funccall
   (lambda (funccall state return break continue throw)
     (let* (
-      (closure (lookup (get-funcName state)))
-      (environment (getEnvFromClosure (closure))))
+      (closure (lookup (get-funcName funccall) state))
+      (environment ((getEnvFromClosure closure) state))
+      (finalenvironment (addParamsToState (getParamsFromClosure closure) (getParamValues funccall) environment)))
         (call/cc
           (lambda
             (return)
-              (interpret-statement-list (getBodyFromClosure closure) return break continue throw))))))
+              (interpret-statement-list (getBodyFromClosure closure) finalenvironment return break continue throw))))))
+
+(define getParamsFromClosure
+  (lambda (closure)
+    (car closure)))
 
 (define getEnvFromClosure
   (lambda (closure)
@@ -100,8 +105,14 @@
   (lambda (closure)
     (cadr closure)))
 
+(define getParamValues
+  (lambda (funccall)
+    (if (list? (caddr funccall))
+    (caddr funccall)
+    (list (caddr funccall)))))
+
 ;Adds the parameter bindings to the state
-(define addParamsToSTate
+(define addParamsToState
   (lambda (varlist vallist state)
     (cond
      ((and (null? varlist) (null? vallist)) (push-frame state))
@@ -216,6 +227,7 @@
       ((eq? expr 'novalue) expr)
       ((eq? expr 'true) #t)
       ((eq? expr 'false) #f)
+      ((eq? (statement-type expr) 'funcall) (interpret-value-funccall expr environment))
       ((not (list? expr)) (lookup expr environment))
       (else (eval-operator expr environment)))))
 
@@ -460,4 +472,5 @@
                             (makestr (string-append str (string-append " " (symbol->string (car vals)))) (cdr vals))))))
       (error-break (display (string-append str (makestr "" vals)))))))
 
-(parser "code.txt")
+
+(interpret "code.txt")
