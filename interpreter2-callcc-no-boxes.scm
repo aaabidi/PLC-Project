@@ -78,6 +78,29 @@
       ((exists? functionName (topFrame BigState)) BigState)
       (else (create-environment-correct functionName (pop-frame BigState))))))
 
+(define interpret-state-funccall
+  (lambda (funccall state return break continue throw)
+    (begin (Mvalue funccall state return break continue throw) state)))
+
+(define interpret-value-funccall
+  (lambda (funccall state return break continue throw)
+    (let* (
+      (closure (lookup (get-funcName state)))
+      (environment (getEnvFromClosure (closure))))
+        (call/cc
+          (lambda
+            (return)
+              (interpret-statement-list (getBodyFromClosure closure) return break continue throw))))))
+
+(define getEnvFromClosure
+  (lambda (closure)
+    (caddr closure)))
+
+(define getBodyFromClosure
+  (lambda (closure)
+    (cadr closure)))
+
+;Adds the parameter bindings to the state
 (define addParamsToSTate
   (lambda (varlist vallist state)
     (cond
