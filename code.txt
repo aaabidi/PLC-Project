@@ -2,12 +2,9 @@ var j = 10;
 
 function main() {
   var x = 10;
-  var y = 20;
-  var z = 30;
-  var min = 0;
 	function nested(){
 		var g = 10;
-		var b = 12;
 	}
-  var max = 100;
 }
+
+main()
