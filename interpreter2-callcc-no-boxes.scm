@@ -78,7 +78,11 @@
       ((exists? functionName (topFrame BigState)) BigState)
       (else (create-environment-correct functionName (pop-frame BigState))))))
 
-
+(define addParamsToSTate
+  (lambda (varlist vallist state)
+    (cond
+     ((and (null? varlist) (null? vallist)) (push-frame state))
+     (else (insert (car varlist) (car vallist) (addParamsToState (cdr varlist) (cdr vallist) state))))))
 
 ; Calls the return continuation with the given expression value
 (define interpret-return
