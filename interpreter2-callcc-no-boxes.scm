@@ -82,7 +82,7 @@
       (call/cc
        (lambda (return)
          (interpret-statement-list (getClosureBody closure) finalenv return break continue throw))))))
-           
+
 ;Helper method to create a parameter layer
 (define paramLayer
   (lambda (varlist vallist)
@@ -227,7 +227,7 @@
 
 ; Evaluates all possible boolean and arithmetic expressions, including constants and variables.
 ;THIS MIGHT BE WRONG
-(define eval-expression 
+(define eval-expression
   (lambda (expr environment return break continue throw)
     (cond
       ((number? expr) expr)

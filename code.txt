@@ -1,11 +1,16 @@
+var x = true;
+var y = true;
+
+function setx(a) {
+  x = a;
+}
+
+function sety(b) {
+  y = b;
+}
+
 function main() {
-  function h() {
-    return 10;
-  }
-
-  function g() {
-    return 100;
-  }
-
-  return g() - h();
+  setx(false);
+  sety(false);
+  return x || y;
 }
