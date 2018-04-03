@@ -32,8 +32,8 @@
 (define interpret-statement
   (lambda (statement environment return break continue throw)
     (cond
-      ;((eq? 'function (statement-type statement)) (interpret-funDec statement))
-      ;((eq? 'funcall (statement-type statement)) (interpret-funCall statement environment return))
+      ((eq? 'function (statement-type statement)) (addFunctionBinding statement environment return break continue throw))
+      ((eq? 'funcall (statement-type statement)) (interpret-state-funCall statement environment return break continue throw))
       ((eq? 'return (statement-type statement)) (interpret-return statement environment return))
       ((eq? 'var (statement-type statement)) (interpret-declare statement environment))
       ((eq? '= (statement-type statement)) (interpret-assign statement environment))
@@ -48,7 +48,7 @@
 
 ;Adds a function binding to its closure
 (define addFunctionBinding
-  (lambda (funcitonDec state)
+  (lambda (functionDec state return break continue throw)
     (insert (get-funcName functionDec) (create-closure functionDec state) state)))
 
 ;Creates a closure for the function list input
