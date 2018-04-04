@@ -42,7 +42,7 @@
       ((eq? 'continue (statement-type statement)) (continue environment))
       ((eq? 'break (statement-type statement)) (break environment))
       ((eq? 'begin (statement-type statement)) (interpret-block statement environment return break continue throw))
-      ((eq? 'throw (statement-type statement)) (interpret-throw statement environment throw))
+      ((eq? 'throw (statement-type statement)) (interpret-throw statement environment return break continue throw))
       ((eq? 'try (statement-type statement)) (interpret-try statement environment return break continue throw))
       (else (myerror "Unknown statement:" (statement-type statement))))))
 
@@ -58,6 +58,7 @@
   (lambda (fundeclare state return break continue throw)
     (insert (getFunName fundeclare) (list (getFunParams fundeclare) (getFunBody fundeclare) (lambda (state) (getFunEnvironment (getFunName fundeclare) state))) (push-frame state))))
 
+;Returns th efunction environment
 (define getFunEnvironment
   (lambda (funName state)
     (cond
@@ -73,22 +74,23 @@
 
 ;evaluates the value of a function call
 ;NOT SURE IF YOU CAN BREAK AND CONTINUE AND THROW BUT I'M PASSING IT IN. IF YOU CAN'T, JUST LET* AN ERROR FOR THOSE CONTINUATIONS
-;If shit doesn't work check this out
 (define evaluate-funcall
  (lambda (funcall state return break continue throw)
     (let* ((closure (lookup (getFunName funcall) state))
           (firstenv ((getClosureEnvProcedure closure) state))
-          (finalenv (cons (paramLayer (getClosureParams closure) (getFuncallParamList funcall 2)) firstenv)))
+          (finalenv (cons (paramLayer (getClosureParams closure) (evaluate-all-in-list (getFuncallParamList funcall 2) state return break continue throw)) firstenv)))
       (call/cc
        (lambda (return)
          (interpret-statement-list (getClosureBody closure) finalenv return break continue throw))))))
-
+           
 ;Helper method to create a parameter layer
+;LOOK AT THIS 
 (define paramLayer
   (lambda (varlist vallist)
-    (if (not (eq? (length varlist) (length vallist)))
-        (error "Incorrect Parameters")
-    (list varlist (boxall vallist)))))
+    (cond
+      ((and (not (null? vallist)) (null? (car vallist))) (list varlist (boxall vallist))) ; manages the edge case where there are no parameters
+      ((not (equal? (length varlist) (length vallist))) (error "Mismatched parameters and inputs"))
+      (else (list varlist (boxall vallist))))))
 
 ;Helper method that boxes everything in a list
 (define boxall
@@ -96,6 +98,13 @@
     (cond
       ((null? list) '())
       (else (cons (box (car list)) (boxall (cdr list)))))))
+
+;Helper method that evaluates every expression in the list
+(define evaluate-all-in-list
+  (lambda (list environment return break continue throw)
+    (cond
+      ((null? list) '())
+      (else (cons (eval-expression (car list) environment return break continue throw) (evaluate-all-in-list (cdr list) environment return break continue throw))))))
 
 ;some abstractions for closures
 (define getClosureEnvProcedure
@@ -174,8 +183,8 @@
 
 ; We use a continuation to throw the proper value. Because we are not using boxes, the environment/state must be thrown as well so any environment changes will be kept
 (define interpret-throw
-  (lambda (statement environment throw)
-    (throw (eval-expression (get-expr statement) environment) environment)))
+  (lambda (statement environment return break continue throw)
+    (throw (eval-expression (get-expr statement) environment return break continue throw) environment)))
 
 ; Interpret a try-catch-finally block
 
@@ -227,9 +236,10 @@
 
 ; Evaluates all possible boolean and arithmetic expressions, including constants and variables.
 ;THIS MIGHT BE WRONG
-(define eval-expression
+(define eval-expression 
   (lambda (expr environment return break continue throw)
     (cond
+      ((null? expr) '())
       ((number? expr) expr)
       ((eq? expr 'novalue) expr)
       ((eq? expr 'true) #t)
@@ -255,14 +265,14 @@
       ((eq? '+ (operator expr)) (+ op1value (eval-expression (operand2 expr) environment return break continue throw)))
       ((eq? '- (operator expr)) (- op1value (eval-expression (operand2 expr) environment return break continue throw)))
       ((eq? '* (operator expr)) (* op1value (eval-expression (operand2 expr) environment return break continue throw)))
-      ((eq? '/ (operator expr)) (quotient op1value (eval-expression (operand2 expr) environment)))
+      ((eq? '/ (operator expr)) (quotient op1value (eval-expression (operand2 expr) environment return break continue throw)))
       ((eq? '% (operator expr)) (remainder op1value (eval-expression (operand2 expr) environment return break continue throw)))
       ((eq? '== (operator expr)) (isequal op1value (eval-expression (operand2 expr) environment return break continue throw)))
       ((eq? '!= (operator expr)) (not (isequal op1value (eval-expression (operand2 expr) environment return break continue throw))))
       ((eq? '< (operator expr)) (< op1value (eval-expression (operand2 expr) environment return break continue throw)))
       ((eq? '> (operator expr)) (> op1value (eval-expression (operand2 expr) environment return break continue throw)))
-      ((eq? '<= (operator expr)) (<= op1value (eval-expression (operand2 expr) environment)))
-      ((eq? '>= (operator expr)) (>= op1value (eval-expression (operand2 expr) environment)))
+      ((eq? '<= (operator expr)) (<= op1value (eval-expression (operand2 expr) environment return break continue throw)))
+      ((eq? '>= (operator expr)) (>= op1value (eval-expression (operand2 expr) environment return break continue throw)))
       ((eq? '|| (operator expr)) (or op1value (eval-expression (operand2 expr) environment return break continue throw)))
       ((eq? '&& (operator expr)) (and op1value (eval-expression (operand2 expr) environment return break continue throw)))
       (else (myerror "Unknown operator:" (operator expr))))))

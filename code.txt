@@ -1,16 +1,14 @@
-var x = true;
-var y = true;
-
-function setx(a) {
-  x = a;
-}
-
-function sety(b) {
-  y = b;
-}
-
 function main() {
-  setx(false);
-  sety(false);
-  return x || y;
+  var x = 10;
+  var y = 20;
+  var z = 30;
+  var min = 0;
+
+  if (x < y)
+    min = x;
+  else
+    min = y;
+  if (min > z)
+    min = z;
+  return min;
 }
