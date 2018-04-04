@@ -106,7 +106,10 @@
       ((null? list) '())
       (else (cons (eval-expression (car list) environment return break continue throw) (evaluate-all-in-list (cdr list) environment return break continue throw))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;some abstractions for closures
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (define getClosureEnvProcedure
   (lambda (closure)
     (caddr closure)))
@@ -127,7 +130,10 @@
       ((eq? n 0) funcall)
       (else (getFuncallParamList (cdr funcall) (- n 1))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;some abstractions for function declarations
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (define getFunName
   (lambda (fundeclare)
     (cadr fundeclare)))
@@ -244,7 +250,7 @@
       ((eq? expr 'novalue) expr)
       ((eq? expr 'true) #t)
       ((eq? expr 'false) #f)
-      ((and (list? expr) (eq? (car expr) 'funcall)) (evaluate-funcall expr environment return break continue throw))
+      ((and (list? expr) (eq? (statement-type expr) 'funcall)) (evaluate-funcall expr environment return break continue throw))
       ((not (list? expr)) (lookup expr environment))
       (else (eval-operator expr environment return break continue throw)))))
 
@@ -488,5 +494,6 @@
                             str
                             (makestr (string-append str (string-append " " (symbol->string (car vals)))) (cdr vals))))))
       (error-break (display (string-append str (makestr "" vals)))))))
+
 
 (interpret "code.txt")
