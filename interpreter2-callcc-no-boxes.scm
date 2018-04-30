@@ -145,6 +145,55 @@
 ;Deals with Classes
 ;------------------
 
+;Evaluate all class definitions in a statement list recursively
+(define interpret-Classes
+  (lambda (statement state return break continue throw)
+    (if(null? statemenet)
+       state
+       (interpretClasses (cdr statement)
+                         (interpret-class (car statement) state return break continue throw)
+                         return break continue throw))))
+
+(define interpret-class
+  (lambda (statement classState return break continue throw)
+    (if (null? (hasSuper statement))
+        (insert (className statement) (list (interpret-do (classBody statement) initial-env return break continue throw)
+        (insert (className statement (list (interpret-do (classBody statement) initial-env return break continue throw)))))))))
+
+(define hasSuper caddr)
+(define className cadr)
+(define classBody cadddr)
+(define getSuper (lambda(v) (cadr (caddr v))))
+(define innerParens car)
+
+
+;return the closure for the object of given class
+(define get-object-closure
+  (lambda (class-name environment)
+    (cond
+      ((no-parent-nonstatic (lookup class-name environment)) 0)
+      ((parent-nonstatic (lookup class-name environment)) 1)
+      ((no-parent-static (lookup class-name environment)) 2)
+      (else 3))))
+
+(define no-parent-nonstatic (lambda(v) (null? (cadr v))))
+(define parent-nonstatic (lambda(v) (not (list? (cadr v)))))
+(define no-parent-static (lambda(v) (null? (caddr v))))
+(define class-environment car)
+(define get-parent-of-nonstatic cadr)
+(define get-parent-of-static caddr)
+
+;recursively evaluates statements and modifies the state appropriately
+;based on their contents.
+(define interpret-do
+  (lambda (statement env return break continue throw)
+    (if (null? statement)
+      env
+      (interpret-do (restOfExpressions statement)
+                    (Mstate (firstExpression statement) env return break continue throw)
+                    return break continue throw))))
+
+
 ;Returns a new class
 (define createClass
   (lambda (parent name)
@@ -214,16 +263,40 @@
 ; Adds a new variable binding to the environment.  There may be an assignment with the variable
 (define interpret-declare
   (lambda (statement environment return break continue throw)
-    (if (exists-declare-value? statement)
-        (insert (get-declare-var statement) (eval-expression (get-declare-value statement) environment return break continue throw) environment)
-        (insert (get-declare-var statement) 'novalue environment))))
+    (cond
+      ((null? (car statement)) (insert (varOf statement)))
+      (else 0))))
+
+
+    ;(if (exists-declare-value? statement)
+     ;   (insert (get-declare-var statement) (eval-expression (get-declare-value statement) environment return break continue throw) environment)
+      ;  (insert (get-declare-var statement) 'novalue environment))))
+
+
+(define Constructor? (lambda (v) (eq? (caaddr v) 'new)))
+(define type (lambda (v) (car (cdaddr v))))
+(define handle-value car)
 
 ; Updates the environment to add an new binding for a variable
 (define interpret-assign
   (lambda (statement environment return break continue throw)
-    (update (get-assign-lhs statement) (eval-expression (get-assign-rhs statement) environment return break continue throw) environment)))
+    (cond
+      ((list? (get-assign-lhs statement)) (interpret-assign-dot environment return break continue throw))
+      (else (update (get-assign-lhs statement) (eval-expression (operand2 statement) environment return break continue throw) enviroment)))))
+      ;(update (get-assign-lhs statement) (eval-expression (get-assign-rhs statement) environment return break continue throw) environment)))
 
-; We need to check if there is an else condition.  Otherwise, we evaluate the expression and do the right thing.
+(define interpret-assign-dot
+  (lambda(statement environment return break continue)
+    (cond
+      ((eq? (assignment-dot-env statement) 'this) (update-existing (assignment-dot-var statement) (eval-expression (assignment-dot-value statement) environment return break continue throw) (pop-frame environment))  
+      ((eq? (assignment-dot-env statement) 'super) (update-existing (assignment-dot-var statement) (eval-expression (assignment-dot-value statement) env r b c t) (pop-frame (pop-frame env))))
+      (else (update-existing (assignment-dot-var statement) (eval-expression (assignment-dot-value statement) environment return break continue throw) (lookup (assignment-dot-env statement))))))))
+
+
+(define assignment-dot-env cadadr)
+(define assignment-dot-var (lambda (v) (caddr (cadr v))))
+(define assignment-dot-value caddr)
+      ; We need to check if there is an else condition.  Otherwise, we evaluate the expression and do the right thing.
 (define interpret-if
   (lambda (statement environment return break continue throw)
     (cond
