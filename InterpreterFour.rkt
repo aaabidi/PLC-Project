@@ -5,7 +5,7 @@
 ; This code was restructured using solution2.scm from Blackboard to better abstract certain
 ; functions and generally clean up interpret.
 (load "classParser.scm")
-
+(require racket/trace)
 ; Interpret a file containing Java-like code.
 ;
 ; Setup:
@@ -83,6 +83,7 @@
       ((eq? (operator statement) 'function) (interpret-func statement state))
       ((eq? (operator statement) 'if) (interpret-if statement state return break continue throw))
       ((eq? (operator statement) 'return) (return statement state))
+      ((eq? (operator statement) 'static-function) (interpret-static-func statement state))
       ((eq? (operator statement) 'throw) (throw (Mvalue (exception statement) state return break continue throw)))
       ((eq? (operator statement) 'try) (interpret-tcf statement state return break continue throw))
       ((eq? (operator statement) 'var) (interpret-var statement state return break continue throw))
@@ -151,6 +152,13 @@
     (cond
       ((exists? (getFuncName statement) env) (error 'redefining (format "function ~a has already been declared" (funcName statement))))
       (else (insert (getFuncName statement) (createClosure (getParams statement) (getBody statement)) env)))))
+
+
+(define interpret-static-func
+  (lambda (statement env)
+    (cond
+      ((exists? (getFuncName statement) env) (error 'redefining (format "function ~a has already been declared" (funcName statement))))
+      (else (cons (car env) (insert (getFuncName statement) (createClosure (getParams statement) (getBody statement)) '((()()))))))))
 
 ;helper methods for Mstate-func
 (define getFuncName cadr)
