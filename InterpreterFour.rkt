@@ -75,13 +75,12 @@
 (define interpret-statement
   (lambda (statement state return break continue throw)
     (cond
-      ((eq? (operator statement) '=) (interpret-assignment statement state return break continue throw))
+      ((eq? (operator statement) '=) (interpret-assign statement state return break continue throw))
       ((eq? (operator statement) 'begin) (interpret-block statement state return break continue throw))
       ((eq? (operator statement) 'break) (break state))
       ((eq? (operator statement) 'continue) (continue state))
       ((eq? (operator statement) 'funcall) (interpret-funcall statement state return break continue throw))
       ((eq? (operator statement) 'function) (interpret-func statement state))
-      ((eq? (operator statement) 'static-function) (interpret-static-func statement state))
       ((eq? (operator statement) 'if) (interpret-if statement state return break continue throw))
       ((eq? (operator statement) 'return) (return statement state))
       ((eq? (operator statement) 'throw) (throw (Mvalue (exception statement) state return break continue throw)))
@@ -90,7 +89,7 @@
       ((eq? (operator statement) 'while)
         (call/cc
           (lambda (new-break)
-            (interpret-while (parse-while-condition statement) (parse-while-statement statement) state return new-break continue throw))))
+            (interpret-while (whileCondition statement) (whileBody statement) state return new-break continue throw))))
       (else (error 'unknown "Encountered an unknown statement")))))
 
 (define exception cadr)
@@ -102,24 +101,25 @@
         environment
         (interpret-statement-list (cdr statement-list) (interpret-statement (car statement-list) environment return break continue throw) return break continue throw))))
 
-; Mstate-assignment handles variable assignment
-(define interpret-assignment
+; Handles assignment
+(define interpret-assign
   (lambda (statement env r b c t)
     (cond
-      ((list? (variable statement)) (interpret-assignment-dot statement env r b c t))
+      ((list? (variable statement)) (interpret-assign-dot statement env r b c t))
       (else (replace_var (variable statement) (Mvalue (operation statement) env r b c t) env)))))
 
-(define interpret-assignment-dot
+(define interpret-assign-dot
   (lambda (statement env r b c t)
     (cond
-      ((eq? (assignment-dot-env statement) 'this) (replace_var (assignment-dot-var statement) (Mvalue (assignment-dot-value statement) env r b c t) (pop-frame env)))
-      ((eq? (assignment-dot-env statement) 'super) (replace_var (assignment-dot-var statement) (Mvalue (assignment-dot-value statement) env r b c t) (pop-frame (pop-frame env))))
-      (else (replace_var (assignment-dot-var statement) (Mvalue (assignment-dot-value statement) env r b c t) (lookup (assignment-dot-env statement)))))))
+      ((eq? (assign-dot-env statement) 'this) (replace_var (assign-dot-var statement) (Mvalue (assignment-dot-value statement) env r b c t) (pop-frame env)))
+      ((eq? (assign-dot-env statement) 'super) (replace_var (assign-dot-var statement) (Mvalue (assignment-dot-value statement) env r b c t) (pop-frame (pop-frame env))))
+      (else (replace_var (assign-dot-var statement) (Mvalue (assign-dot-value statement) env r b c t) (lookup (assignment-dot-env statement)))))))
 
-(define assignment-dot-env cadadr)
-(define assignment-dot-var (lambda (v) (caddr (cadr v))))
-(define assignment-dot-value caddr)
+(define assign-dot-env cadadr)
+(define assign-dot-var (lambda (v) (caddr (cadr v))))
+(define assign-dot-value caddr)
 
+;Handles Block Statements
 (define interpret-block
   (lambda (statement environment return break continue throw)
     (pop-frame (interpret-statement-list (cdr statement)
@@ -128,7 +128,7 @@
                                          (lambda (env) (break (pop-frame env)))
                                          (lambda (env) (continue (pop-frame env)))
                                          (lambda (v env) (throw v (pop-frame env)))))))
-; Mstate-if handles if statements
+; handles if statements
 ; Statement format: (else-statement is optional)
 ; (if (condition) (statement) (else-statement))
 (define interpret-if
@@ -149,17 +149,11 @@
 (define interpret-func
   (lambda (statement env)
     (cond
-      ((exists? (funcName statement) env) (error 'redefining (format "function ~a has already been declared" (funcName statement))))
-      (else (insert (funcName statement) (createClosure (getParams statement) (getBody statement)) env)))))
-
-(define interpret-static-func
-  (lambda (statement env)
-    (cond
-      ((exists? (funcName statement) env) (error 'redefining (format "function ~a has already been declared" (funcName statement))))
-      (else (cons (car env) (insert (funcName statement) (createClosure (getParams statement) (getBody statement)) '((()()))))))))
+      ((exists? (getFuncName statement) env) (error 'redefining (format "function ~a has already been declared" (funcName statement))))
+      (else (insert (getFuncName statement) (createClosure (getParams statement) (getBody statement)) env)))))
 
 ;helper methods for Mstate-func
-(define funcName cadr)
+(define getFuncName cadr)
 (define getParams caddr)
 
 ; When a function is called without the calling line needing its return
@@ -268,8 +262,8 @@
                     throw)
       env)))
 
-(define parse-while-condition cadr)
-(define parse-while-statement caddr)
+(define whileCondition cadr)
+(define whileBody caddr)
 
 ; Mvalue: Evaluate an expression to determine its value.
 ; Last params are return break continue throw. Shortened for brevity.
@@ -332,7 +326,7 @@
   (lambda (statement env return break continue throw)
     (call/cc
       (lambda (new-return)
-        (let* ((func-name (funcName statement))
+        (let* ((func-name (getFuncName statement))
                (function (lookup func-name env)))
               (do-interpret (getFuncBody function)
                             ; replace the below with a call to the function closure's create-env function
@@ -481,20 +475,6 @@
 
 ; HELPER METHODS
 
-;(define lookup
- ; (lambda (var state)
-  ;  (cond
-   ;   ((null? state) (error 'unknown (format "Symbol ~a does not exist" var)))
-    ;  ((env-contains-symbol? var (variables state)) (lookupVal var (topframe state)))
-     ; (else (lookup var (remainingframes state))))))
-
-;(define lookupVal
- ; (lambda (var state)
-  ;  (cond
-   ;   ((eq? (variable1 state) var) (unbox (valueOfVar1 state)))
-    ;  (else (lookupVal var (cons (restOfVars state) (cons (restOfValues state) '())))))))
-
-
 ;helpers for lookup
 (define remainingframes cdr)
 
@@ -539,11 +519,11 @@
   (lambda (var varList)
     (cond
      ((null? varList) #f)
-     ((eq? var (var1 varList)) #t)
+     ((eq? var (firstVar varList)) #t)
      (else (env-contains-symbol? var (cdr varList))))))
 
 ;helper for state contains
-(define var1 car)
+(define firstVar car)
 
 (define resOfVariablesInState cdr)
 
@@ -551,13 +531,6 @@
 (define push-frame
   (lambda (state)
     (cons '(()()) state)))
-
-
-;secondLevelVariables gets the variables in the outer most scope
-(define secondLevelVariables caadr)
-
-;secondLevelValues gets the values in the outer most scope
-(define secondLevelValues cadadr)
 
 ;gets the first variable in the state
 (define variable1 caar)
