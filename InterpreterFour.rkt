@@ -1,21 +1,16 @@
 ;#lang racket
-; EECS 345 Class Project
-; James Hochadel and Andrew Marmorstein
-;
-; This code was restructured using solution2.scm from Blackboard to better abstract certain
-; functions and generally clean up interpret.
+
 (load "classParser.scm")
 (require racket/trace)
-; Interpret a file containing Java-like code.
-;
+
 ; Setup:
 ; 1. Create initial-return, which accepts a statement and the environment from which the return
 ;    was called, evaluates the statement, and returns the result.
 ; 2. Create outer-environment, which contains all class definitions.
-; 3. Create begin-interpret, a function that calls the main method in class classname.
-;
+; 3. Create run, a function that calls the main method in class classname.
 ; Execution: Run begin-interpret. Pass it outer-environment with an empty layer for main's local
 ; variable and function definitions.
+
 (define interpret
   (lambda (filename classname)
     (call/cc
@@ -23,11 +18,11 @@
         (let* ((initial-return (lambda (statement env) (return (eval-expression (operand statement) env return default-break default-continue default-throw))))
                (outer-environment (interpret-classes (parser filename) initial-env (lambda (statement env) (return env)) default-break default-continue default-throw))
                (main-closure (lookup 'main (lookup (string->symbol classname) outer-environment)))
-               (begin-interpret (lambda (env) (do-interpret (getFuncBody main-closure) env initial-return default-break default-continue default-throw))))
+               (run (lambda (env) (do-interpret (getFuncBody main-closure) env initial-return default-break default-continue default-throw))))
 
               ; Begin interpreting. Pass in the environment, which is built by interpreting the outermost layer
               ; of the program, containing function and global variable definitions.
-              (begin-interpret (push-frame outer-environment)))))))
+              (run (push-frame outer-environment)))))))
 
 ;(define main '((funcall main)))
 ;(define mainFuncall car)
@@ -37,28 +32,27 @@
   (lambda (statement state return break continue throw)
     (if (null? statement)
       state
-      (interpret-classes (restOfExpressions statement)
-                         (Mclass-state (firstExpression statement) state return break continue throw)
+      (interpret-classes (nextExpressions statement)
+                         (interpret-class (firstExpression statement) state return break continue throw)
                          return break continue throw))))
 
-; do-interpret recursively evaluates statements and modifies the state appropriately
-; based on their contents.
+; do-interpret takes statements, evaluates them, and changes the state recursively
 (define do-interpret
   (lambda (statement state return break continue throw)
     (if (null? statement)
       state
-      (do-interpret (restOfExpressions statement)
+      (do-interpret (nextExpressions statement)
                     (interpret-statement (firstExpression statement) state return break continue throw)
                     return break continue throw))))
 
 (define initial-env '(((true false) (true false))))
-(define default-break (lambda (s) (error 'invalidBreak "Break was called outside of a while loop")))
-(define default-continue (lambda (s) (error 'invalidContinue "Continue was called outside of a while loop")))
-(define default-throw (lambda (e s) (error 'uncaughtException "An exception was thrown but not caught")))
+(define default-break (lambda (s) (error 'badBreak "break can only be called in a loop")))
+(define default-continue (lambda (s) (error 'badContinue "continue can only be called in a loop")))
+(define default-throw (lambda (e s) (error 'uncaughtError "Error was  not caught")))
 
-; Mclass-state add a class from the given statement to the class environment
+; interpret-class add a class from the given statement to the class environment
 ; the environment will have class and their defffenitions which include fields and functions/closures
-(define Mclass-state
+(define interpret-class
   (lambda (statement class-state return break continue throw)
     (cond
       ((null? (has-super statement)) (insert (className statement) (append (do-interpret (body statement) initial-env return break continue throw) '(())) class-state))
@@ -106,8 +100,8 @@
 (define interpret-assign
   (lambda (statement env r b c t)
     (cond
-      ((list? (variable statement)) (interpret-assign-dot statement env r b c t))
-      (else (replace_var (variable statement) (eval-expression (operation statement) env r b c t) env)))))
+      ((list? (varOfstatement)) (interpret-assign-dot statement env r b c t))
+      (else (replace_var (varOfstatement) (eval-expression (operation statement) env r b c t) env)))))
 
 (define interpret-assign-dot
   (lambda (statement env r b c t)
@@ -169,7 +163,7 @@
 ; Statement format:
 ; (funcall function-name actual-param-1 actual-param-2 ...)
 (define interpret-funcall
-  (lambda (funcall env return break continue throw) 
+  (lambda (funcall env return break continue throw)
     (begin (Mvalue-funcall funcall env return break continue throw) env)))
 
 ;helpers for Mstate-funcall
@@ -225,12 +219,10 @@
 (define interpret-var
   (lambda (statement env r b c t)
     (cond
-      ;((exists? (variable statement) env) (error 'redefining (format "Variable ~a has already been declared" (variable statement))))
-      ((null? (thirdElement statement)) (insert (variable statement) 'undefined env))
-      ((not (list? (unNestIfValue (thirdElement statement)))) (insert (variable statement) (eval-expression (operation statement) env r b c t) env))
-      (else (insert (variable statement) (get-class-env (class-type statement) env) env)))))
+      ((null? (thirdElement statement)) (insert (varOf statement) 'undefined env))
+      ((not (list? (unNestIfValue (thirdElement statement)))) (insert (varOf statement) (eval-expression (operation statement) env r b c t) env))
+      (else (insert (varOf statement) (get-class-env (class-type statement) env) env)))))
 
-(define isConstructor (lambda (v) (eq? (caaddr v) 'new)))
 (define class-type (lambda (v) (car (cdaddr v))))
 (define unNestIfValue car)
 
@@ -282,16 +274,9 @@
       ((eq? expr 'true) 'true)
       ((eq? expr 'false) 'false)
       ((not (list? expr)) (lookup expr env))
-      ((eq? (operator expr) '+) (+ (eval-expression (operand1 expr) env r b c t) (eval-expression (operand2 expr) env r b c t))) 
-      ((eq? (operator expr) '-) (if (null? (cddr expr))
-                                         (- (eval-expression (operand1 expr) env r b c t)) ; unary "-"
-                                         (- (eval-expression (operand1 expr) env r b c t) (eval-expression (operand2 expr) env r b c t))))
-      ((eq? (operator expr) '*) (* (eval-expression (operand1 expr) env r b c t) (eval-expression (operand2 expr) env r b c t)))
-      ((eq? (operator expr) '/) (quotient (eval-expression (operand1 expr) env r b c t) (eval-expression (operand2 expr) env r b c t)))
-      ((eq? (operator expr) '%) (remainder (eval-expression (operand1 expr) env r b c t) (eval-expression (operand2 expr) env r b c t)))
-      ((eq? (operator expr) 'funcall) (Mvalue-funcall expr env r b c t))
-      ((eq? (operator expr) 'dot) (Mvalue-dot expr env r b c t))
-      (else (Mbool expr env r b c t)))))
+      ((eq? (operator expr) 'funcall) (evaluate-funcall expr env r b c t))
+      ((eq? (operator expr) 'dot) (evaluate-dot expr env r b c t))
+      (else (eval-operator expr environment return break continue throw)))))
 
 (define operator car)
 (define operand1 cadr)
@@ -300,7 +285,7 @@
 
 ;Mvalue-dot gets the value based of of the specified environment
 ;it has a different case for handleing the possible operands before the dot
-(define Mvalue-dot
+(define evaluate-dot
   (lambda (statement env r b c t)
     (cond
       ((eq? (operand1 statement) 'this) (eval-expression (operand2 statement) (pop-frame env) r b c t))
@@ -333,7 +318,7 @@
     (call/cc
       (lambda (new-return)
         (let* ((func-name (getFuncName expr))
-               (function (lookup func-name env)))
+              (function (lookup func-name env)))
               (do-interpret (getFuncBody function)
                             ; replace the below with a call to the function closure's create-env function
                             ; function in the closure should already pass the function name into getFunctionExecutionEnvironment
@@ -396,15 +381,15 @@
       ((and (null? formalParams) (not (null? actualParams))) (error 'methodSignature (format "too many parameters")))
       ((and (not (null? formalParams)) (null? actualParams)) (error 'methodSignature (format "too few parameters")))
       ((null? formalParams) localEnv)
-      (else (bindActualToFormal (restOfParams formalParams)
-                                (restOfParamValues actualParams)
+      (else (bindActualToFormal (nextParams formalParams)
+                                (nextParamValues actualParams)
                                 env
                                 (topframe (insert (currentParam formalParams) (eval-expression (currentParamValue actualParams) env r b c t) (cons localEnv '())))
                                 r b c t)))))
 
 ;helpers for bindActualToFormal
-(define restOfParams cdr)
-(define restOfParamValues cdr)
+(define nextParams cdr)
+(define nextParamValues cdr)
 (define currentParam car)
 (define currentParamValue car)
 
@@ -412,17 +397,17 @@
 (define Mbool
   (lambda (statement state r b c t)
     (cond
-      ((not (list? statement)) (eval-expresion statement state r b c t))
+      ((not (list? statement)) (eval-expression statement state r b c t))
       ((eq? statement 'true) 'true)
       ((eq? statement 'false) 'false)
-      ((not (list? statement)) (eval-expresion statement state r b c t))
+      ((not (list? statement)) (eval-expression statement state r b c t))
       ((eq? (comparator statement) '>) (if (> (eval-expression (operand1 statement) state r b c t) (eval-expression (operand2 statement) state r b c t)) 'true 'false))
       ((eq? (comparator statement) '<) (if (< (eval-expression (operand1 statement) state r b c t) (eval-expression (operand2 statement) state r b c t)) 'true 'false))
-      ((eq? (comparator statement) '>=) (if (>= (eval-expresion (operand1 statement) state r b c t) (eval-expresion (operand2 statement) state r b c t)) 'true 'false))
-      ((eq? (comparator statement) '<=) (if (<= (eval-expresion (operand1 statement) state r b c t) (eval-expresion (operand2 statement) state r b c t)) 'true 'false))
-      ((eq? (comparator statement) '==) (if (= (eval-expresion (operand1 statement) state r b c t) (eval-expresion (operand2 statement) state r b c t)) 'true 'false))
-      ((eq? (comparator statement) '!=) (if (not (= (eval-expresion (operand1 statement) state r b c t) (eval-expresion (operand2 statement) state r b c t))) 'true 'false))
-      ((eq? (comparator statement) 'funcall) (eval-expresion statement state r b c t))
+      ((eq? (comparator statement) '>=) (if (>= (eval-expression (operand1 statement) state r b c t) (eval-expression (operand2 statement) state r b c t)) 'true 'false))
+      ((eq? (comparator statement) '<=) (if (<= (eval-expression (operand1 statement) state r b c t) (eval-expression (operand2 statement) state r b c t)) 'true 'false))
+      ((eq? (comparator statement) '==) (if (= (eval-expression (operand1 statement) state r b c t) (eval-expression (operand2 statement) state r b c t)) 'true 'false))
+      ((eq? (comparator statement) '!=) (if (not (= (eval-expression (operand1 statement) state r b c t) (eval-expression (operand2 statement) state r b c t))) 'true 'false))
+      ((eq? (comparator statement) 'funcall) (eval-expression statement state r b c t))
       ((eq? (operator statement) '&&) (if (eq? #t (and (eq? 'true (Mbool (operand1 statement) state r b c t)) (eq? 'true (Mbool (operand2 statement) state r b c t)))) 'true 'false))
       ((eq? (operator statement) '||) (if (eq? #t (or (eq? 'true (Mbool (operand1 statement) state r b c t)) (eq? 'true (Mbool (operand2 statement) state r b c t)))) 'true 'false))
       ((eq? (operator statement) '!) (if (eq? #t (not (eq? 'true (Mbool (operand1 statement) state r b c t)))) 'true 'false))
@@ -433,17 +418,6 @@
 
 ; Evaluates all possible boolean and arithmetic expressions, including constants and variables.
 ;THIS MIGHT BE WRONG
-(define eval-expression 
-  (lambda (expr environment return break continue throw)
-    (cond
-      ((null? expr) '())
-      ((number? expr) expr)
-      ((eq? expr 'novalue) expr)
-      ((eq? expr 'true) #t)
-      ((eq? expr 'false) #f)
-      ((and (list? expr) (eq? (car expr) 'funcall)) (evaluate-funcall expr environment return break continue throw))
-      ((not (list? expr)) (lookup expr environment))
-      (else (eval-operator expr environment return break continue throw)))))
 
 ; Evaluate a binary (or unary) operator.  Although this is not dealing with side effects, I have the routine evaluate the left operand first and then
 ; pass the result to eval-binary-op2 to evaluate the right operand.  This forces the operands to be evaluated in the proper order in case you choose
@@ -500,8 +474,8 @@
 (define get_replaced
   (lambda (var value state)
     (cond
-      ((eq? (variable1 state) var) (cons (cons var (restOfVars state)) (cons (cons (begin (set-box! (valueOfVar1 state) value) (valueOfVar1 state)) (restOfValues state)) '())))
-      (else (topframe (insert (variable1 state) (unbox (valueOfVar1 state)) (cons (get_replaced var value (cons (restOfVars state) (cons (restOfValues state) '()))) '())))))))
+      ((eq? (variable1 state) var) (cons (cons var (nextVars state)) (cons (cons (begin (set-box! (valueOfVar1 state) value) (valueOfVar1 state)) (nextValues state)) '())))
+      (else (topframe (insert (variable1 state) (unbox (valueOfVar1 state)) (cons (get_replaced var value (cons (nextVars state) (cons (nextValues state) '()))) '())))))))
 
 ;insert inerts a variable into the state, if the value already exists it replaces it
 ;returns the state with a given variable and value added in
@@ -547,10 +521,10 @@
 (define valueOfVar1 caadr)
 
 ;rest of the variables in the state
-(define restOfVars cdar)
+(define nextVars cdar)
 
 ;rest of the values in the state
-(define restOfValues cdadr)
+(define nextValues cdadr)
 
 ;get the values in the state
 (define allValues cadar)
@@ -559,16 +533,10 @@
 (define firstExpression car)
 
 ;the rest of the expressions in the programs
-(define restOfExpressions cdr)
-
-;action
-(define action caar)
-
-;the expression being returned
-(define expression cdar)
+(define nextExpressions cdr)
 
 ;variable
-(define variable cadr)
+(define varOf cadr)
 
 ;third element
 (define thirdElement cddr)
@@ -759,7 +727,7 @@
     (cadr (top-frame environment))))
 
 
-; Functions to convert the Scheme #t and #f to our languages true and false, and back.
+; alternates between #t/#f and true and false
 
 (define language->scheme
   (lambda (v)
