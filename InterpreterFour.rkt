@@ -7,40 +7,33 @@
     (call/cc
       (lambda (return)
         (let* ((initial-return (lambda (statement env) (return (eval-expression (operand statement) env return default-break default-continue default-throw))))
-               (outer-environment (interpret-classes (parser filename) initial-env (lambda (statement env) (return env)) default-break default-continue default-throw))
+               (outer-environment (interpret-classes (parser filename) newenvironment (lambda (statement env) (return env)) default-break default-continue default-throw))
                (main-closure (lookup 'main (lookup (string->symbol classname) outer-environment)))
-               (run (lambda (env) (do-interpret (getFuncBody main-closure) env initial-return default-break default-continue default-throw))))
-              (run (push-frame outer-environment)))))))
+               (run (lambda (env) (interpret-do (getFuncBody main-closure) env initial-return default-break default-continue default-throw))))
+               (run (push-frame outer-environment)))))))
 
 ; interprets code in classes
 (define interpret-classes
   (lambda (statement state return break continue throw)
     (if (null? statement)
       state
-      (interpret-classes (nextExpressions statement)
-                         (interpret-class (firstExpression statement) state return break continue throw)
-                         return break continue throw))))
+      (interpret-classes (nextExpressions statement) (interpret-class (firstExpression statement) state return break continue throw) return break continue throw))))
 
 ; updates state with evaluated statements
-(define do-interpret
+(define interpret-do
   (lambda (statement state return break continue throw)
     (if (null? statement)
       state
-      (do-interpret (nextExpressions statement)
+      (interpret-do (nextExpressions statement)
                     (interpret-statement (firstExpression statement) state return break continue throw)
                     return break continue throw))))
-
-(define initial-env '((() ())))
-(define default-break (lambda (s) (error 'badBreak "break can only be called in a loop")))
-(define default-continue (lambda (s) (error 'badContinue "continue can only be called in a loop")))
-(define default-throw (lambda (e s) (error 'uncaughtError "error was  not caught")))
 
 ; interpret-class add a class from the given statement to the class environment
 (define interpret-class
   (lambda (statement class-state return break continue throw)
     (cond
-      ((null? (hasParent statement)) (insert (className statement) (append (do-interpret (body statement) initial-env return break continue throw) '(())) class-state))
-      (else (insert (className statement) (append (do-interpret (body statement) initial-env return break continue throw) (cons (getParent statement) '())) class-state)))))
+      ((null? (hasParent statement)) (insert (className statement) (append (interpret-do (body statement) newenvironment return break continue throw) '(())) class-state))
+      (else (insert (className statement) (append (interpret-do (body statement) newenvironment return break continue throw) (cons (getParent statement) '())) class-state)))))
 
 (define hasParent caddr)
 (define className cadr)
@@ -60,7 +53,6 @@
       ((eq? (operator statement) 'function) (interpret-func statement state))
       ((eq? (operator statement) 'if) (interpret-if statement state return break continue throw))
       ((eq? (operator statement) 'return) (return statement state))
-      ((eq? (operator statement) 'static-function) (interpret-static-func statement state))
       ((eq? (operator statement) 'throw) (throw (eval-expression (exception statement) state return break continue throw)))
       ((eq? (operator statement) 'try) (interpret-tcf statement state return break continue throw))
       ((eq? (operator statement) 'var) (interpret-var statement state return break continue throw))
@@ -90,24 +82,14 @@
 (define interpret-assign-dot
   (lambda (statement env return break continue throw)
     (cond
-      ((eq? (assign-dot-env statement) 'this) (replace_var (assign-dot-var statement) (eval-expression (assignment-dot-value statement) env return break continue throw) (pop-frame env)))
-      ((eq? (assign-dot-env statement) 'super) (replace_var (assign-dot-var statement) (eval-expression (assignment-dot-value statement) env return break continue throw) (pop-frame (pop-frame env))))
-      (else (replace_var (assign-dot-var statement) (eval-expression (assign-dot-val statement) env return break continue throw) (lookup (assignment-dot-env statement)))))))
-
-; Abstractions for dot assignments
-(define assign-dot-env cadadr)
-(define assign-dot-var (lambda (v) (caddr (cadr v))))
-(define assign-dot-val caddr)
+      ((eq? (dot-env statement) 'this) (replace_var (dot-var statement) (eval-expression (dot-val statement) env return break continue throw) (pop-frame env)))
+      ((eq? (dot-env statement) 'super) (replace_var (dot-var statement) (eval-expression (dot-val statement) env return break continue throw) (pop-frame (pop-frame env))))
+      (else (replace_var (dot-var statement) (eval-expression (dot-val statement) env return break continue throw) (lookup (assignment-dot-env statement)))))))
 
 ; Interprets block statements
 (define interpret-block
   (lambda (statement environment return break continue throw)
-    (pop-frame (interpret-statement-list (cdr statement)
-                                         (push-frame environment)
-                                         return
-                                         (lambda (env) (break (pop-frame env)))
-                                         (lambda (env) (continue (pop-frame env)))
-                                         (lambda (v env) (throw v (pop-frame env)))))))
+    (pop-frame (interpret-statement-list (cdr statement) (push-frame environment) return (lambda (env) (break (pop-frame env))) (lambda (env) (continue (pop-frame env))) (lambda (v env) (throw v (pop-frame env)))))))
 
 ; Interprets if statements
 (define interpret-if
@@ -117,12 +99,6 @@
       ((not (null? (else-statement-exists statement))) (interpret (else-statement statement) env return break continue throw))
       (else env))))
 
-; Abstractions for if statements
-(define else-statement-exists cdddr)
-(define if-condition cadr)
-(define if-statement caddr)
-(define else-statement cadddr)
-
 ; Interprets functions
 (define interpret-func
   (lambda (statement env)
@@ -130,88 +106,18 @@
       ((exists? (getFuncName statement) env) (error 'nameTaken "a function name was used twice"))
       (else (insert (getFuncName statement) (createClosure (getParams statement) (getBody statement)) env)))))
 
-;helper methods for evaluation
-(define getFuncName cadr)
-(define getParams caddr)
-
-; When a function is called without the calling line needing its return
-; value, execute the function and then return the environment.
-; Statement format:
-; (funcall function-name actual-param-1 actual-param-2 ...)
+; Interprets function calls
 (define interpret-funcall
   (lambda (funcall env return break continue throw)
     (begin (Mvalue-funcall funcall env return break continue throw) env)))
 
-;helpers for Mstate-funcall
-(define globalStateOfEnvironment cdr)
-(define getFuncBody cadr)
-(define getFuncEnvironment caddr)
-(define getBody cadddr)
-
-; Modify the state based on a try-catch-finally block.
-; Statement format, where each "body" can consist of multiple statements in a list:
-; (try (try-body) (catch (exception-name) (catch-body)) (finally (finally-body)))
-(define interpret-tcf
-  (lambda (statement env return break continue throw)
-    (call/cc
-      (lambda (catch-continuation)
-        (letrec ((finally (lambda (s)
-                  (if (pair? (finally-stmt statement))
-                      (interpret-begin (finally-body statement) s return break continue throw)
-                      s)))
-                (try (lambda (new-throw)
-                  ; if this try block is accompanied by a catch block, pass a continuation that
-                  ; jumps us to it when we encounter a throw. Otherwise, pass whatever throw continuation
-                  ; we were passed when we entered this try block.
-                  (if (pair? (catch-block statement))
-                    (finally (interpret-begin (try-body statement) env return break continue new-throw))
-                    (finally (interpret-begin (try-body statement) env return break continue throw)))))
-                (catch (lambda (e s)
-                  (finally (catch-block (catch-body statement) (catch-err statement) e s return break continue throw)))))
-                ; Call "try" with catch as the catch-continuation
-                (try (lambda (e) (catch-continuation (catch e env)))))))))
-
-; Same as Mstate-begin, but with the addition of inserting the exception into the
-; environment before calling do-interpret.
-(define catch-begin
-  (lambda (statement e-name e-value env return break continue throw)
-    (pop-frame (do-interpret statement
-                                 (insert e-name e-value (push-frame env))
-                                 return
-                                 (lambda (s) (break (pop-frame s)))
-                                 (lambda (s) (continue (pop-frame s)))
-                                 throw))))
-
-(define try-body cadr)
-(define catch-body (lambda (v) (caddr (caddr v))))
-(define catch-block caddr)
-(define catch-err (lambda (v) (car (cadr (caddr v)))))
-(define finally-stmt (lambda (t) (car (cdddr t))))
-(define finally-body (lambda (t) (cadr (car (cdddr t)))))
-
-; Mstate variable declaration
+; Interprets variable declarations
 (define interpret-var
   (lambda (statement env return break continue throw)
     (cond
       ((null? (thirdElement statement)) (insert (varOf statement) 'undefined env))
-      ((not (list? (unNestIfValue (thirdElement statement)))) (insert (varOf statement) (eval-expression (operation statement) env return break continue throw) env))
+      ((not (list? (car (thirdElement statement)))) (insert (varOf statement) (eval-expression (operation statement) env return break continue throw) env))
       (else (insert (varOf statement) (get-class-env (class-type statement) env) env)))))
-
-(define class-type (lambda (v) (car (cdaddr v))))
-(define unNestIfValue car)
-
-;take a class name and environment and return the closure for that class
-(define get-class-env
-  (lambda (class-name env)
-    (cond
-      ((no-parent (lookup class-name env)) (cons (class-env (lookup class-name env)) env))
-      (else (cons (class-env (lookup class-name env)) (get-class-env (get-parent (lookup class-name env)) env))))))
-
-(define no-parent (lambda (v) (null? (cadr v))))
-(define has-parent (lambda (v) (not (list? (cadr v)))))
-(define class-env car)
-(define get-parent cadr)
-
 
 ; Interprets while statements
 (define interpret-while
@@ -221,11 +127,16 @@
         statement
         (call/cc
           (lambda (new-continue)
-            (interpret statement env return break new-continue throw)))
-        return break continue throw) env)))
+            (interpret statement env return break new-continue throw))) return break continue throw) env)))
 
-(define whileCondition cadr)
-(define whileBody caddr)
+(define class-type (lambda (v) (car (cdaddr v))))
+
+;take a class name and environment and return the closure for that class
+(define get-class-env
+  (lambda (classname env)
+    (cond
+      ((no-parent (lookup classname env)) (cons (class-env (lookup classname env)) env))
+      (else (cons (class-env (lookup classname env)) (get-class-env (get-parent (lookup classname env)) env))))))
 
 ; Evaluates individual expressions
 (define eval-expression
@@ -238,11 +149,6 @@
       ((eq? (operator expr) 'funcall) (evaluate-funcall expr env return break continue throw))
       ((eq? (operator expr) 'dot) (evaluate-dot expr env return break continue throw))
       (else (eval-operator expr env return break continue throw)))))
-
-(define operator car)
-(define operand1 cadr)
-(define operand2 caddr)
-(define operand operand1)
 
 ; Evaluates the value of a dot expression in a given environment
 (define evaluate-dot
@@ -260,11 +166,6 @@
       ((eq? (class-type-of-function statement) 'super) (eval-funcall-with-env (append (cons 'funcall (cons (function-call statement) '())) (params-of-funcall statement)) (pop-frame env) return break continue throw))
       (else (eval-funcall-with-env (append (cons 'funcall (cons (function-call statement) '())) (params-of-funcall statement)) (lookup (class-type-of-function statement) env) return break continue throw)))))
 
-; Abstractions for funciton calls
-(define function-call (lambda (v) (car (cddadr v))))
-(define params-of-funcall cddr)
-(define class-type-of-function cadadr)
-
 ; Evaluates a function call with a given environment
 (define eval-funcall-with-env
   (lambda (expr env return break continue throw)
@@ -272,13 +173,13 @@
       (lambda (new-return)
         (let* ((func-name (getFuncName expr))
               (function (lookup func-name env)))
-              (do-interpret (getFuncBody function)
-                            (functionExecutionEnvironment expr env return break continue throw)
+              (interpret-do (getFuncBody function)
+                            (functionEnv expr env return break continue throw)
                             (lambda (expr env) (new-return (eval-expression (operand expr) env return break continue throw)))
                             break continue throw))))))
 
 ; REturns the environment for a function call
-(define functionExecutionEnvironment
+(define functionEnv
   (lambda (funcall env return break continue throw)
     (cons (bindParameters (function-name funcall) (paramsOf funcall) env return break continue throw) (functionDeclarationEnvironment (function-name funcall) env))))
 
@@ -311,13 +212,6 @@
       ((and (not (null? formalParams)) (null? actualParams)) (error 'badParams (format "parameter mismatch")))
       ((null? formalParams) localEnv)
       (else (bindActualToFormal (nextParams formalParams (nextParamValues actualParams) env (topframe (insert (currentParam formalParams) (eval-expression (currentParamValue actualParams) env  return break continue throw) (cons localEnv '()))) return break continue throw))))))
-
-;helpers for bindActualToFormal
-(define nextParams cdr)
-(define nextParamValues cdr)
-(define currentParam car)
-(define currentParamValue car)
-
 
 (define eval-operator
   (lambda (expr environment return break continue throw)
@@ -352,13 +246,6 @@
         (= val1 val2)
         (eq? val1 val2))))
 
-; HELPER METHODS
-
-;helpers for lookup
-(define remainingframes cdr)
-
-(define variableList caar)
-
 ; remove removes a variable from the state
 ; it takes the variable name and the state and removes it from the state
 (define replace_var
@@ -377,101 +264,29 @@
 ;createClosure creates a closure functon that will be added to the state
 (define createClosure
   (lambda (params body)
-    (cons params (cons body (cons functionExecutionEnvironment '())))))
+    (cons params (cons body (cons functionEnv '())))))
 
 ;exists?? checks if the variable has already been declared in the state
 (define exists?
   (lambda (var state)
     (cond
       ((null? state) #f)
-      ((in-env? var (top-frame-variables state)) #t)
+      ((exists-in-list? var (top-frame-variables state)) #t)
       (else (exists? var (remainingframes state))))))
 
-(define in-env?
-  (lambda (var varList)
+; does a variable exist in a list?
+(define exists-in-list?
+  (lambda (var l)
     (cond
-     ((null? varList) #f)
-     ((eq? var (firstVar varList)) #t)
-     (else (in-env? var (cdr varList))))))
+      ((null? l) #f)
+      ((eq? var (car l)) #t)
+      (else (exists-in-list? var (cdr l))))))
 
-;helper for state contains
-(define firstVar car)
 
-(define resOfVariablesInState cdr)
-
-;adds a level of scope to the given state
+; add a frame onto the top of the environment
 (define push-frame
   (lambda (state)
     (cons '(()()) state)))
-
-;gets the first variable in the state
-(define variable1 caar)
-
-;gets the value associated with the first variable in the state
-(define valueOfVar1 caadr)
-
-;rest of the variables in the state
-(define nextVars cdar)
-
-;rest of the values in the state
-(define nextValues cdadr)
-
-;get the values in the state
-(define allValues cadar)
-
-;the expression in the stat of the program
-(define firstExpression car)
-
-;the rest of the expressions in the programs
-(define nextExpressions cdr)
-
-;variable
-(define varOf cadr)
-
-;third element
-(define thirdElement cddr)
-
-;operation
-(define operation caddr)
-
-;-----------------
-; HELPER FUNCTIONS
-;-----------------
-
-; These helper functions define the operator and operands of a value expression
-(define operator car)
-(define operand1 cadr)
-(define operand2 caddr)
-(define operand3 cadddr)
-
-(define exists-operand2?
-  (lambda (statement)
-    (not (null? (cddr statement)))))
-
-(define exists-operand3?
-  (lambda (statement)
-    (not (null? (cdddr statement)))))
-
-; these helper functions define the parts of the various statement types
-(define statement-type operator)
-(define get-expr operand1)
-(define get-declare-var operand1)
-(define get-declare-value operand2)
-(define exists-declare-value? exists-operand2?)
-(define get-assign-lhs operand1)
-(define get-assign-rhs operand2)
-(define get-condition operand1)
-(define get-then operand2)
-(define get-else operand3)
-(define get-body operand2)
-(define exists-else? exists-operand3?)
-(define get-try operand1)
-(define get-catch operand2)
-(define get-finally operand3)
-
-(define catch-var
-  (lambda (catch-statement)
-    (car (operand1 catch-statement))))
 
 ;------------------------
 ; Environment/State Functions
@@ -487,17 +302,13 @@
 
 ; add a frame onto the top of the environment
 (define push-frame
-  (lambda (environment)
+  (lambda (env)
     (cons newframe env)))
 
 ; remove a frame from the environment
 (define pop-frame
   (lambda (environment)
     (cdr env)))
-
-; some abstractions
-(define topframe car)
-(define remainingframes cdr)
 
 ; does a variable exist in the environment?
 (define exists?
@@ -607,12 +418,8 @@
     (cadr frame)))
 
 (define top-frame-variables
-  (lambda (environment)
+  (lambda (env)
     (variables (topframe env))))
-
-(define top-frame-store
-  (lambda (environment)
-    (cadr (top-frame env))))
 
 ; alternates between #t/#f and true and false
 (define language->scheme
@@ -628,3 +435,114 @@
       ((eq? v #f) 'false)
       ((eq? v #t) 'true)
       (else v))))
+
+(define default-break (lambda (s) (error 'badBreak "break can only be called in a loop")))
+(define default-continue (lambda (s) (error 'badContinue "continue can only be called in a loop")))
+(define default-throw (lambda (e s) (error 'uncaughtError "error was  not caught")))
+
+;-----------------
+; HELPER FUNCTIONS
+;-----------------
+
+; Some general abstractions
+(define variable1 caar)
+(define valueOfVar1 caadr)
+(define nextVars cdar)
+(define nextValues cdadr)
+(define allValues cadar)
+(define firstExpression car)
+(define nextExpressions cdr)
+(define varOf cadr)
+(define thirdElement cddr)
+(define operation caddr)
+
+; These helper functions define the operator and operands of a value expression
+(define operator car)
+(define operand1 cadr)
+(define operand2 caddr)
+(define operand3 cadddr)
+
+(define exists-operand2?
+  (lambda (statement)
+    (not (null? (cddr statement)))))
+
+(define exists-operand3?
+  (lambda (statement)
+    (not (null? (cdddr statement)))))
+
+; these helper functions define the parts of the various statement types
+(define statement-type operator)
+(define get-expr operand1)
+(define get-declare-var operand1)
+(define get-declare-value operand2)
+(define exists-declare-value? exists-operand2?)
+(define get-assign-lhs operand1)
+(define get-assign-rhs operand2)
+(define get-condition operand1)
+(define get-then operand2)
+(define get-else operand3)
+(define get-body operand2)
+(define exists-else? exists-operand3?)
+(define get-try operand1)
+(define get-catch operand2)
+(define get-finally operand3)
+
+(define catch-var
+  (lambda (catch-statement)
+    (car (operand1 catch-statement))))
+
+;abstractions for lookup
+(define remainingframes cdr)
+(define variableList caar)
+
+;  abstractions for frames
+(define topframe car)
+(define remainingframes cdr)
+
+; abstractions for bindActualToFormal
+(define nextParams cdr)
+(define nextParamValues cdr)
+(define currentParam car)
+(define currentParamValue car)
+
+; abstractions for eval expressions(define operator car)
+(define operand1 cadr)
+(define operand2 caddr)
+(define operand operand1)
+
+;helper for in-env?
+(define firstVar car)
+(define resOfVariablesInState cdr)
+
+; Abstractions for the function call environment function
+(define function-name cadr)
+(define paramsOf cddr)
+
+; abstractions for function calls
+(define function-call (lambda (v) (car (cddadr v))))
+(define params-of-funcall cddr)
+(define class-type-of-function cadadr)
+
+;abstractions for class evaluation
+(define no-parent (lambda (v) (null? (cadr v))))
+(define has-parent (lambda (v) (not (list? (cadr v)))))
+(define class-env car)
+(define get-parent cadr)
+(define whileCondition cadr)
+(define whileBody caddr)
+
+;helpers for interpret-funcall
+(define globalStateOfEnvironment cdr)
+(define getFuncBody cadr)
+(define getFuncEnvironment caddr)
+(define getBody cadddr)
+
+;abstractions methods for evaluation
+(define getFuncName cadr)
+(define getParams caddr)
+
+; abstractions for if statements
+(define else-statement-exists cdddr)
+(define if-condition cadr)
+(define if-statement caddr)
+(define else-statement cadddr)
