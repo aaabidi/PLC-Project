@@ -20,7 +20,7 @@
   (lambda (filename classname)
     (call/cc
       (lambda (return)
-        (let* ((initial-return (lambda (statement env) (return (Mvalue (operand statement) env return default-break default-continue default-throw))))
+        (let* ((initial-return (lambda (statement env) (return (eval-expression (operand statement) env return default-break default-continue default-throw))))
                (outer-environment (interpret-classes (parser filename) initial-env (lambda (statement env) (return env)) default-break default-continue default-throw))
                (main-closure (lookup 'main (lookup (string->symbol classname) outer-environment)))
                (begin-interpret (lambda (env) (do-interpret (getFuncBody main-closure) env initial-return default-break default-continue default-throw))))
@@ -84,7 +84,7 @@
       ((eq? (operator statement) 'if) (interpret-if statement state return break continue throw))
       ((eq? (operator statement) 'return) (return statement state))
       ((eq? (operator statement) 'static-function) (interpret-static-func statement state))
-      ((eq? (operator statement) 'throw) (throw (Mvalue (exception statement) state return break continue throw)))
+      ((eq? (operator statement) 'throw) (throw (eval-expression (exception statement) state return break continue throw)))
       ((eq? (operator statement) 'try) (interpret-tcf statement state return break continue throw))
       ((eq? (operator statement) 'var) (interpret-var statement state return break continue throw))
       ((eq? (operator statement) 'while)
@@ -107,14 +107,14 @@
   (lambda (statement env r b c t)
     (cond
       ((list? (variable statement)) (interpret-assign-dot statement env r b c t))
-      (else (replace_var (variable statement) (Mvalue (operation statement) env r b c t) env)))))
+      (else (replace_var (variable statement) (eval-expression (operation statement) env r b c t) env)))))
 
 (define interpret-assign-dot
   (lambda (statement env r b c t)
     (cond
-      ((eq? (assign-dot-env statement) 'this) (replace_var (assign-dot-var statement) (Mvalue (assignment-dot-value statement) env r b c t) (pop-frame env)))
-      ((eq? (assign-dot-env statement) 'super) (replace_var (assign-dot-var statement) (Mvalue (assignment-dot-value statement) env r b c t) (pop-frame (pop-frame env))))
-      (else (replace_var (assign-dot-var statement) (Mvalue (assign-dot-value statement) env r b c t) (lookup (assignment-dot-env statement)))))))
+      ((eq? (assign-dot-env statement) 'this) (replace_var (assign-dot-var statement) (eval-expression (assignment-dot-value statement) env r b c t) (pop-frame env)))
+      ((eq? (assign-dot-env statement) 'super) (replace_var (assign-dot-var statement) (eval-expression (assignment-dot-value statement) env r b c t) (pop-frame (pop-frame env))))
+      (else (replace_var (assign-dot-var statement) (eval-expression (assign-dot-value statement) env r b c t) (lookup (assignment-dot-env statement)))))))
 
 (define assign-dot-env cadadr)
 (define assign-dot-var (lambda (v) (caddr (cadr v))))
@@ -227,7 +227,7 @@
     (cond
       ;((exists? (variable statement) env) (error 'redefining (format "Variable ~a has already been declared" (variable statement))))
       ((null? (thirdElement statement)) (insert (variable statement) 'undefined env))
-      ((not (list? (unNestIfValue (thirdElement statement)))) (insert (variable statement) (Mvalue (operation statement) env r b c t) env))
+      ((not (list? (unNestIfValue (thirdElement statement)))) (insert (variable statement) (eval-expression (operation statement) env r b c t) env))
       (else (insert (variable statement) (get-class-env (class-type statement) env) env)))))
 
 (define isConstructor (lambda (v) (eq? (caaddr v) 'new)))
@@ -275,23 +275,23 @@
 
 ; Mvalue: Evaluate an expression to determine its value.
 ; Last params are return break continue throw. Shortened for brevity.
-(define Mvalue
-  (lambda (statement env r b c t)
+(define eval-expression
+  (lambda (expr env r b c t)
     (cond
-      ((number? statement) statement)
-      ((eq? statement 'true) 'true)
-      ((eq? statement 'false) 'false)
-      ((not (list? statement)) (lookup statement env))
-      ((eq? (operator statement) '+) (+ (Mvalue (operand1 statement) env r b c t) (Mvalue (operand2 statement) env r b c t)))
-      ((eq? (operator statement) '-) (if (null? (cddr statement))
-                                         (- (Mvalue (operand1 statement) env r b c t)) ; unary "-"
-                                         (- (Mvalue (operand1 statement) env r b c t) (Mvalue (operand2 statement) env r b c t))))
-      ((eq? (operator statement) '*) (* (Mvalue (operand1 statement) env r b c t) (Mvalue (operand2 statement) env r b c t)))
-      ((eq? (operator statement) '/) (quotient (Mvalue (operand1 statement) env r b c t) (Mvalue (operand2 statement) env r b c t)))
-      ((eq? (operator statement) '%) (remainder (Mvalue (operand1 statement) env r b c t) (Mvalue (operand2 statement) env r b c t)))
-      ((eq? (operator statement) 'funcall) (Mvalue-funcall statement env r b c t))
-      ((eq? (operator statement) 'dot) (Mvalue-dot statement env r b c t))
-      (else (Mbool statement env r b c t)))))
+      ((number? expr) expr)
+      ((eq? expr 'true) 'true)
+      ((eq? expr 'false) 'false)
+      ((not (list? expr)) (lookup expr env))
+      ((eq? (operator expr) '+) (+ (eval-expression (operand1 expr) env r b c t) (eval-expression (operand2 expr) env r b c t))) 
+      ((eq? (operator expr) '-) (if (null? (cddr expr))
+                                         (- (eval-expression (operand1 expr) env r b c t)) ; unary "-"
+                                         (- (eval-expression (operand1 expr) env r b c t) (eval-expression (operand2 expr) env r b c t))))
+      ((eq? (operator expr) '*) (* (eval-expression (operand1 expr) env r b c t) (eval-expression (operand2 expr) env r b c t)))
+      ((eq? (operator expr) '/) (quotient (eval-expression (operand1 expr) env r b c t) (eval-expression (operand2 expr) env r b c t)))
+      ((eq? (operator expr) '%) (remainder (eval-expression (operand1 expr) env r b c t) (eval-expression (operand2 expr) env r b c t)))
+      ((eq? (operator expr) 'funcall) (Mvalue-funcall expr env r b c t))
+      ((eq? (operator expr) 'dot) (Mvalue-dot expr env r b c t))
+      (else (Mbool expr env r b c t)))))
 
 (define operator car)
 (define operand1 cadr)
@@ -303,24 +303,22 @@
 (define Mvalue-dot
   (lambda (statement env r b c t)
     (cond
-      ((eq? (operand1 statement) 'this) (Mvalue (operand2 statement) (pop-frame env) r b c t))
-      ((eq? (operand1 statement) 'super) (Mvalue (operand2 statement) (pop-frame (pop-frame env)) r b c t))
-      (else (Mvalue (operand2 statement) (lookup (operand1 statement) env) r b c t)))))
+      ((eq? (operand1 statement) 'this) (eval-expression (operand2 statement) (pop-frame env) r b c t))
+      ((eq? (operand1 statement) 'super) (eval-expression (operand2 statement) (pop-frame (pop-frame env)) r b c t))
+      (else (eval-expression (operand2 statement) (lookup (operand1 statement) env) r b c t)))))
 
 ;Mvalue-funcall gets the value of a function call
 ;this function takes the statemetn and creats a usable statement for the old Mvalue-funcall by parsing and reorderin g and then getting the correct environment
-(define Mvalue-funcall
+(define evaluate-funcall
   (lambda (statement env return break continue throw)
     (cond
-      ((eq? (class-type-of-function statement) 'this) (Mvalue-funcall-with-env (append (cons 'funcall (cons (function-call statement) '())) (params-of-funcall statement)) env return break continue throw))
-      ((eq? (class-type-of-function statement) 'super) (Mvalue-funcall-with-env (append (cons 'funcall (cons (function-call statement) '())) (params-of-funcall statement)) (pop-frame env) return break continue throw))
-      (else (Mvalue-funcall-with-env (append (cons 'funcall (cons (function-call statement) '())) (params-of-funcall statement)) (lookup (class-type-of-function statement) env) return break continue throw)))))
-
+      ((eq? (class-type-of-function statement) 'this) (eval-funcall-with-env (append (cons 'funcall (cons (function-call statement) '())) (params-of-funcall statement)) env return break continue throw))
+      ((eq? (class-type-of-function statement) 'super) (eval-funcall-with-env (append (cons 'funcall (cons (function-call statement) '())) (params-of-funcall statement)) (pop-frame env) return break continue throw))
+      (else (eval-funcall-with-env (append (cons 'funcall (cons (function-call statement) '())) (params-of-funcall statement)) (lookup (class-type-of-function statement) env) return break continue throw)))))
 
 (define function-call (lambda (v) (car (cddadr v))))
 (define params-of-funcall cddr)
 (define class-type-of-function cadadr)
-                                               
 ; When a function is called, Mvalue-funcall does the following:
 ; 1. Creates the function's execution environment using the environment function stored
 ;    in the function closure
@@ -330,21 +328,23 @@
 ; Differing
 ; Execute a function and return the value produced by its return statement.
 ; TODO: Match env-contains-symbol? check from Mstate-funcall
-(define Mvalue-funcall-with-env
-  (lambda (statement env return break continue throw)
+(define eval-funcall-with-env
+  (lambda (expr env return break continue throw)
     (call/cc
       (lambda (new-return)
-        (let* ((func-name (getFuncName statement))
+        (let* ((func-name (getFuncName expr))
                (function (lookup func-name env)))
               (do-interpret (getFuncBody function)
                             ; replace the below with a call to the function closure's create-env function
                             ; function in the closure should already pass the function name into getFunctionExecutionEnvironment
                             ; so that we don't have to do it here
-                            (functionExecutionEnvironment statement env return break continue throw)
-                            (lambda (statement env) (new-return (Mvalue (operand statement) env return break continue throw)))
+                            (functionExecutionEnvironment expr env return break continue throw)
+                            (lambda (expr env) (new-return (eval-expression (operand expr) env return break continue throw)))
                             break
                             continue
                             throw))))))
+
+
 
 ; getFunctionExecutionEnviroinment gets the execution environment for a function call,
 ; which includes everything available to the function through static scoping along with
@@ -399,7 +399,7 @@
       (else (bindActualToFormal (restOfParams formalParams)
                                 (restOfParamValues actualParams)
                                 env
-                                (topframe (insert (currentParam formalParams) (Mvalue (currentParamValue actualParams) env r b c t) (cons localEnv '())))
+                                (topframe (insert (currentParam formalParams) (eval-expression (currentParamValue actualParams) env r b c t) (cons localEnv '())))
                                 r b c t)))))
 
 ;helpers for bindActualToFormal
@@ -412,17 +412,17 @@
 (define Mbool
   (lambda (statement state r b c t)
     (cond
-      ((not (list? statement)) (Mvalue statement state r b c t))
+      ((not (list? statement)) (eval-expresion statement state r b c t))
       ((eq? statement 'true) 'true)
       ((eq? statement 'false) 'false)
-      ((not (list? statement)) (Mvalue statement state r b c t))
-      ((eq? (comparator statement) '>) (if (> (Mvalue (operand1 statement) state r b c t) (Mvalue (operand2 statement) state r b c t)) 'true 'false))
-      ((eq? (comparator statement) '<) (if (< (Mvalue (operand1 statement) state r b c t) (Mvalue (operand2 statement) state r b c t)) 'true 'false))
-      ((eq? (comparator statement) '>=) (if (>= (Mvalue (operand1 statement) state r b c t) (Mvalue (operand2 statement) state r b c t)) 'true 'false))
-      ((eq? (comparator statement) '<=) (if (<= (Mvalue (operand1 statement) state r b c t) (Mvalue (operand2 statement) state r b c t)) 'true 'false))
-      ((eq? (comparator statement) '==) (if (= (Mvalue (operand1 statement) state r b c t) (Mvalue (operand2 statement) state r b c t)) 'true 'false))
-      ((eq? (comparator statement) '!=) (if (not (= (Mvalue (operand1 statement) state r b c t) (Mvalue (operand2 statement) state r b c t))) 'true 'false))
-      ((eq? (comparator statement) 'funcall) (Mvalue statement state r b c t))
+      ((not (list? statement)) (eval-expresion statement state r b c t))
+      ((eq? (comparator statement) '>) (if (> (eval-expression (operand1 statement) state r b c t) (eval-expression (operand2 statement) state r b c t)) 'true 'false))
+      ((eq? (comparator statement) '<) (if (< (eval-expression (operand1 statement) state r b c t) (eval-expression (operand2 statement) state r b c t)) 'true 'false))
+      ((eq? (comparator statement) '>=) (if (>= (eval-expresion (operand1 statement) state r b c t) (eval-expresion (operand2 statement) state r b c t)) 'true 'false))
+      ((eq? (comparator statement) '<=) (if (<= (eval-expresion (operand1 statement) state r b c t) (eval-expresion (operand2 statement) state r b c t)) 'true 'false))
+      ((eq? (comparator statement) '==) (if (= (eval-expresion (operand1 statement) state r b c t) (eval-expresion (operand2 statement) state r b c t)) 'true 'false))
+      ((eq? (comparator statement) '!=) (if (not (= (eval-expresion (operand1 statement) state r b c t) (eval-expresion (operand2 statement) state r b c t))) 'true 'false))
+      ((eq? (comparator statement) 'funcall) (eval-expresion statement state r b c t))
       ((eq? (operator statement) '&&) (if (eq? #t (and (eq? 'true (Mbool (operand1 statement) state r b c t)) (eq? 'true (Mbool (operand2 statement) state r b c t)))) 'true 'false))
       ((eq? (operator statement) '||) (if (eq? #t (or (eq? 'true (Mbool (operand1 statement) state r b c t)) (eq? 'true (Mbool (operand2 statement) state r b c t)))) 'true 'false))
       ((eq? (operator statement) '!) (if (eq? #t (not (eq? 'true (Mbool (operand1 statement) state r b c t)))) 'true 'false))
